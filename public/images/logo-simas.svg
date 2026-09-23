@@ -1,0 +1,12 @@
+<svg width="56" height="56" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="56" height="56" rx="12" fill="#00652C"/>
+  <!-- Minangkabau Gonjong / Roof Outline -->
+  <path d="M12 36L20 25L28 17L36 25L44 36H12Z" fill="#15803D" opacity="0.4"/>
+  <path d="M14 36C18 31 22 23 20 18C23 22 26 27 28 30C30 27 33 22 36 18C34 23 38 31 42 36H14Z" fill="#95F8A7"/>
+  <path d="M22 36V30H34V36H22Z" fill="#FFFFFF" opacity="0.9"/>
+  <circle cx="28" cy="25" r="2.5" fill="#FFFFFF"/>
+  <!-- Base Plate & Pillars -->
+  <rect x="18" y="36" width="20" height="3" rx="1" fill="#FFFFFF"/>
+  <rect x="20" y="39" width="16" height="2" rx="1" fill="#95F8A7" opacity="0.8"/>
+  <text x="28" y="47" text-anchor="middle" fill="#FFFFFF" font-family="'Plus Jakarta Sans', sans-serif" font-weight="700" font-size="6" letter-spacing="1">UNAND</text>
+</svg>
