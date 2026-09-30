@@ -1,30 +1,30 @@
+import type { Metadata } from "next";
 import HeroPanel from "@/components/layouts/HeroPanel";
 import LoginForm from "@/components/forms/LoginForm";
 
+// ============================================================
+// LoginPage — Layout classes defined in globals.css:
+//   .auth-card, .auth-card__hero, .auth-card__form
+// Responsive breakpoints also live in globals.css.
+// ============================================================
+
+export const metadata: Metadata = {
+  title: "Masuk — SIMAS Asrama Unand",
+  description:
+    "Masuk ke Sistem Informasi Absensi Asrama Universitas Andalas menggunakan NIM dan kata sandi Anda.",
+};
+
 export default function LoginPage() {
   return (
-    <div className="w-full flex justify-center items-center py-4">
-      {/* Authentication Layout Container */}
-      <div
-        className="flex flex-col lg:flex-row bg-white rounded-xl overflow-hidden shadow-2xl relative"
-        style={{
-          width: "1216px",
-          maxWidth: "100%",
-          minHeight: "640px",
-          boxShadow:
-            "0px 20px 25px -5px rgba(0, 0, 0, 0.1), 0px 8px 10px -6px rgba(0, 0, 0, 0.1)",
-          borderRadius: "12px",
-        }}
-      >
-        {/* Left Column: Hero Context */}
-        <div className="hidden lg:block flex-shrink-0">
-          <HeroPanel />
-        </div>
+    <div className="auth-card">
+      {/* Left: Branding/Hero panel */}
+      <div className="auth-card__hero">
+        <HeroPanel />
+      </div>
 
-        {/* Right Column: Authentication Desk */}
-        <div className="flex-1 flex justify-center items-center">
-          <LoginForm />
-        </div>
+      {/* Right: Form panel */}
+      <div className="auth-card__form">
+        <LoginForm />
       </div>
     </div>
   );
