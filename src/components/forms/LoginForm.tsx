@@ -1,17 +1,43 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { api } from "@/lib/apiClient";
+
+interface LoginResponseData {
+  access_token: string;
+  user: {
+    id: number;
+    nim: string;
+    nama: string;
+    role: string;
+  };
+}
+
+interface LoginResponse {
+  success: boolean;
+  message?: string;
+  data?: LoginResponseData;
+}
 
 export default function LoginForm() {
   const router = useRouter();
-  const savedNim = typeof window === "undefined" ? "" : localStorage.getItem("remember_nim") || "";
-  const [nim, setNim] = useState(savedNim);
+
+  // Baca savedNim di useEffect supaya tidak ada hydration mismatch
+  const [nim, setNim] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(Boolean(savedNim));
+  const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    const savedNim = localStorage.getItem("remember_nim") ?? "";
+    if (savedNim) {
+      setNim(savedNim);
+      setRememberMe(true);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,30 +48,21 @@ export default function LoginForm() {
 
     setIsLoading(true);
     try {
-      const apiHost =
-        process.env.NEXT_PUBLIC_API_URL ||
-        (typeof window !== "undefined" && window.location.port === "3000"
-          ? "http://127.0.0.1:5000"
-          : "");
-
-      const response = await fetch(`${apiHost}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nim: nim.trim(), password }),
+      // Gunakan apiClient — sudah handle base URL secara konsisten
+      const result = await api.post<LoginResponse>("/api/auth/login", {
+        nim: nim.trim(),
+        password,
       });
 
-      const result = await response.json().catch(() => null);
-
-      if (!response.ok || !result?.success) {
+      if (!result?.success || !result.data?.access_token) {
         setErrorMessage(result?.message || "Login gagal. Periksa NIM dan kata sandi Anda.");
         setIsLoading(false);
         return;
       }
 
-      if (result.data?.access_token) {
-        localStorage.setItem("access_token", result.data.access_token);
-        localStorage.setItem("user", JSON.stringify(result.data.user));
-      }
+      // Simpan token dan data user ke localStorage
+      localStorage.setItem("access_token", result.data.access_token);
+      localStorage.setItem("user", JSON.stringify(result.data.user));
 
       if (rememberMe) {
         localStorage.setItem("remember_nim", nim.trim());
@@ -53,14 +70,19 @@ export default function LoginForm() {
         localStorage.removeItem("remember_nim");
       }
 
-      const userRole = result.data?.user?.role;
-      if (userRole === "admin" || userRole === "fasilitator") {
+      const userRole = result.data.user?.role;
+      // Backend menyimpan role sebagai 'fasil' atau 'admin'
+      if (userRole === "admin" || userRole === "fasil" || userRole === "fasilitator") {
         router.push("/fasilitator/dashboard");
       } else {
         router.push("/mahasiswa/dashboard");
       }
-    } catch {
-      setErrorMessage("Tidak dapat terhubung ke server. Pastikan server aktif.");
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Tidak dapat terhubung ke server. Pastikan server aktif.";
+      setErrorMessage(message);
       setIsLoading(false);
     }
   };
