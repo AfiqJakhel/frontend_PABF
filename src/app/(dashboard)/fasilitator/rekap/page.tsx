@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useApi } from "@/hooks/useApi";
+import type { ApiResponse, AttendanceSummaryData } from "@/types/attendance";
 
 interface RecapItem {
   id: string;
@@ -18,70 +20,27 @@ interface RecapItem {
 
 export default function FasilitatorRekapPage() {
   const [filterGedung, setFilterGedung] = useState("all");
-  const [filterBulan, setFilterBulan] = useState("September 2026");
+  const now = new Date();
+  const [filterBulan, setFilterBulan] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
+  const [tahun, bulan] = filterBulan.split("-").map(Number);
+  const tanggalMulai = `${filterBulan}-01`;
+  const tanggalSelesai = `${filterBulan}-${String(new Date(tahun, bulan, 0).getDate()).padStart(2, "0")}`;
+  const { data: response, loading, error } = useApi<ApiResponse<AttendanceSummaryData>>(
+    `/api/fasil/presensi/rekap?tanggal_mulai=${tanggalMulai}&tanggal_selesai=${tanggalSelesai}&summary=true`
+  );
 
-  const recapData: RecapItem[] = [
-    {
-      id: "REC-01",
-      nim: "2211523011",
-      nama: "Muhammad Afiq",
-      gedung: "Gedung A",
-      kamar: "204",
-      totalHadir: 24,
-      totalTerlambat: 0,
-      totalIzin: 0,
-      totalAlpha: 0,
-      persentase: 100,
-    },
-    {
-      id: "REC-02",
-      nim: "2211522045",
-      nama: "Rifqi Pratama",
-      gedung: "Gedung B",
-      kamar: "108",
-      totalHadir: 23,
-      totalTerlambat: 1,
-      totalIzin: 0,
-      totalAlpha: 0,
-      persentase: 96,
-    },
-    {
-      id: "REC-03",
-      nim: "2211521019",
-      nama: "Fajar Maulana",
-      gedung: "Gedung A",
-      kamar: "312",
-      totalHadir: 22,
-      totalTerlambat: 1,
-      totalIzin: 1,
-      totalAlpha: 0,
-      persentase: 92,
-    },
-    {
-      id: "REC-04",
-      nim: "2211523088",
-      nama: "Dinda Rahmawati",
-      gedung: "Gedung Putri C",
-      kamar: "201",
-      totalHadir: 24,
-      totalTerlambat: 0,
-      totalIzin: 0,
-      totalAlpha: 0,
-      persentase: 100,
-    },
-    {
-      id: "REC-05",
-      nim: "2211522010",
-      nama: "Ilham Ramadhan",
-      gedung: "Gedung B",
-      kamar: "204",
-      totalHadir: 19,
-      totalTerlambat: 3,
-      totalIzin: 1,
-      totalAlpha: 1,
-      persentase: 79,
-    },
-  ];
+  const recapData: RecapItem[] = (response?.data?.summary ?? []).map((item) => ({
+    id: item.nim,
+    nim: item.nim,
+    nama: item.nama,
+    gedung: item.gedung ?? "-",
+    kamar: item.kamar ?? "-",
+    totalHadir: item.hadir,
+    totalTerlambat: item.terlambat,
+    totalIzin: item.izin + item.sakit,
+    totalAlpha: item.alfa,
+    persentase: item.persentase,
+  }));
 
   const filtered = recapData.filter((item) => {
     if (filterGedung !== "all" && item.gedung !== filterGedung) return false;
@@ -100,7 +59,7 @@ export default function FasilitatorRekapPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `Rekap_Presensi_Asrama_${filterBulan.replace(" ", "_")}.csv`);
+    link.setAttribute("download", `Rekap_Presensi_Asrama_${filterBulan}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -151,9 +110,9 @@ export default function FasilitatorRekapPage() {
               onChange={(e) => setFilterBulan(e.target.value)}
               className="text-xs p-2 bg-[#FAF8FF] border border-[#E2E8F0] rounded-lg font-medium text-[#131B2E]"
             >
-              <option value="September 2026">September 2026 (Aktif)</option>
-              <option value="Agustus 2026">Agustus 2026</option>
-              <option value="Juli 2026">Juli 2026</option>
+              <option value="2026-10">Oktober 2026</option>
+              <option value="2026-09">September 2026</option>
+              <option value="2026-08">Agustus 2026</option>
             </select>
           </div>
 
@@ -176,6 +135,9 @@ export default function FasilitatorRekapPage() {
           Total Data: <span className="font-bold text-[#131B2E]">{filtered.length} Mahasiswa</span>
         </div>
       </div>
+
+      {loading && <div className="text-sm text-[#6F7A6E]">Memuat rekap dari server...</div>}
+      {error && <div role="alert" className="rounded-xl border border-[#FECDD3] bg-[#FFF1F2] px-4 py-3 text-sm text-[#BE123C]">Gagal mengambil rekap: {error}</div>}
 
       {/* Table */}
       <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-xs overflow-hidden">

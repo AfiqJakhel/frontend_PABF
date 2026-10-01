@@ -2,19 +2,30 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useApi } from "@/hooks/useApi";
+import type { ApiResponse, AttendanceHistoryData, AttendanceRecord } from "@/types/attendance";
 
 export default function MahasiswaDashboardPage() {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [mounted, setMounted] = useState<boolean>(false);
+  const { data: todayResponse } = useApi<ApiResponse<AttendanceRecord[]>>("/api/mahasiswa/presensi/hari-ini");
+  const { data: historyResponse } = useApi<ApiResponse<AttendanceHistoryData>>("/api/mahasiswa/presensi/riwayat?per_page=100");
+  const todayRecords = todayResponse?.data ?? [];
+  const historyRecords = historyResponse?.data?.items ?? [];
+  const firstTodayRecord = todayRecords[0];
+  const nightRecord = todayRecords.find((record) => record.sesi === "malam");
 
   useEffect(() => {
-    setMounted(true);
-    const now = new Date();
-    setCurrentDate(now);
-    setSelectedMonth(now.getMonth());
-    setSelectedYear(now.getFullYear());
+    const timer = window.setTimeout(() => {
+      const now = new Date();
+      setMounted(true);
+      setCurrentDate(now);
+      setSelectedMonth(now.getMonth());
+      setSelectedYear(now.getFullYear());
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const monthNames = [
@@ -78,9 +89,10 @@ export default function MahasiswaDashboardPage() {
     if (isCurrentMonthView) {
       const todayDate = currentDate.getDate();
       if (day === todayDate) return "today";
-      if (day === 15) return "izin";
-      if (day === 22) return "ditolak";
-      if (day < todayDate) return "hadir";
+      const record = historyRecords.find((item) => item.tanggal === `${selectedYear}-${String(selectedMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`);
+      if (record?.status === "izin" || record?.status === "sakit") return "izin";
+      if (record?.status === "alfa") return "ditolak";
+      if (record) return "hadir";
       return "future";
     }
 
@@ -89,9 +101,10 @@ export default function MahasiswaDashboardPage() {
       selectedYear < currentDate.getFullYear() ||
       (selectedYear === currentDate.getFullYear() && selectedMonth < currentDate.getMonth())
     ) {
-      if (day === 15) return "izin";
-      if (day === 22) return "ditolak";
-      return "hadir";
+      const record = historyRecords.find((item) => item.tanggal === `${selectedYear}-${String(selectedMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`);
+      if (record?.status === "izin" || record?.status === "sakit") return "izin";
+      if (record?.status === "alfa") return "ditolak";
+      return record ? "hadir" : "future";
     }
 
     // Future month view
@@ -109,14 +122,6 @@ export default function MahasiswaDashboardPage() {
     : "Memuat tanggal...";
 
   // Formatted date string for section subtitle: e.g. "30 September 2026"
-  const formattedDateFull = mounted
-    ? new Intl.DateTimeFormat("id-ID", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      }).format(currentDate)
-    : "Hari Ini";
-
   return (
     <div className="mhs-dashboard">
       {/* ── Section 1: Top Greeting & Header Bar ── */}
@@ -162,7 +167,7 @@ export default function MahasiswaDashboardPage() {
                 </div>
                 <div className="mhs-card__text-col">
                   <span className="mhs-card__label">PRESENSI MASUK</span>
-                  <span className="mhs-card__value">06:45 WIB</span>
+                  <span className="mhs-card__value">{firstTodayRecord ? new Intl.DateTimeFormat("id-ID", { timeStyle: "short" }).format(new Date(firstTodayRecord.waktu)) : "Belum Absen"}</span>
                 </div>
               </div>
 
@@ -170,7 +175,7 @@ export default function MahasiswaDashboardPage() {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#155B00" strokeWidth="2.5">
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
-                <span>SUDAH ABSEN</span>
+                <span>{firstTodayRecord ? firstTodayRecord.status.toUpperCase() : "BELUM ABSEN"}</span>
               </div>
             </div>
 
@@ -198,7 +203,7 @@ export default function MahasiswaDashboardPage() {
                 </div>
                 <div className="mhs-card__text-col">
                   <span className="mhs-card__label">PRESENSI MALAM</span>
-                  <span className="mhs-card__value">Belum Absen</span>
+                  <span className="mhs-card__value">{nightRecord ? new Intl.DateTimeFormat("id-ID", { timeStyle: "short" }).format(new Date(nightRecord.waktu)) : "Belum Absen"}</span>
                 </div>
               </div>
 

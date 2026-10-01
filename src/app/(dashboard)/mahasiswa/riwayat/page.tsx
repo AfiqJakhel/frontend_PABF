@@ -2,67 +2,24 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useApi } from "@/hooks/useApi";
+import type { ApiResponse, AttendanceHistoryData } from "@/types/attendance";
 
 export default function MahasiswaRiwayatPage() {
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
-
-  const attendanceData = [
-    {
-      id: "ABS-01",
-      tanggal: "24 Sep 2026",
-      waktu: "17:40 WIB",
-      tipe: "Presensi Asrama",
-      lokasi: "Pintu Gedung Asrama A",
-      status: "Disetujui",
-      catatan: "Wajah jelas, tepat waktu.",
-    },
-    {
-      id: "ABS-02",
-      tanggal: "24 Sep 2026",
-      waktu: "07:15 WIB",
-      tipe: "Presensi Asrama",
-      lokasi: "Pos Keamanan Utama",
-      status: "Disetujui",
-      catatan: "Keperluan kuliah.",
-    },
-    {
-      id: "ABS-03",
-      tanggal: "23 Sep 2026",
-      waktu: "21:30 WIB",
-      tipe: "Presensi Asrama",
-      lokasi: "Pintu Gedung Asrama A",
-      status: "Disetujui",
-      catatan: "Kembali sebelum batas jam malam.",
-    },
-    {
-      id: "ABS-04",
-      tanggal: "22 Sep 2026",
-      waktu: "20:05 WIB",
-      tipe: "Presensi Kegiatan",
-      lokasi: "Masjid Asrama Unand",
-      status: "Menunggu",
-      catatan: "Sedang ditinjau oleh fasilitator.",
-    },
-    {
-      id: "ABS-05",
-      tanggal: "20 Sep 2026",
-      waktu: "22:15 WIB",
-      tipe: "Presensi Asrama",
-      lokasi: "Pintu Gedung Asrama A",
-      status: "Ditolak",
-      catatan: "Foto buram & melewati batas jam malam (22:00 WIB).",
-    },
-    {
-      id: "ABS-06",
-      tanggal: "19 Sep 2026",
-      waktu: "06:30 WIB",
-      tipe: "Presensi Kegiatan",
-      lokasi: "Lapangan Asrama Unand",
-      status: "Disetujui",
-      catatan: "Senam Pagi Asrama.",
-    },
-  ];
+  const { data: response, loading, error } = useApi<ApiResponse<AttendanceHistoryData>>(
+    "/api/mahasiswa/presensi/riwayat?per_page=100"
+  );
+  const attendanceData = (response?.data?.items ?? []).map((item) => ({
+    id: String(item.id),
+    tanggal: new Intl.DateTimeFormat("id-ID", { dateStyle: "medium" }).format(new Date(item.tanggal)),
+    waktu: new Intl.DateTimeFormat("id-ID", { timeStyle: "short" }).format(new Date(item.waktu)),
+    tipe: item.sesi,
+    lokasi: item.latitude != null && item.longitude != null ? `${item.latitude}, ${item.longitude}` : "Lokasi tidak tersedia",
+    status: item.status,
+    catatan: item.keterangan ?? "Tidak ada keterangan.",
+  }));
 
   const filtered = attendanceData.filter((item) => {
     if (filterType !== "all" && item.tipe !== filterType) return false;
@@ -109,8 +66,9 @@ export default function MahasiswaRiwayatPage() {
               className="text-xs p-2 bg-[#FAF8FF] border border-[#E2E8F0] rounded-lg font-medium text-[#131B2E]"
             >
               <option value="all">Semua Tipe</option>
-              <option value="Presensi Asrama">Presensi Asrama</option>
-              <option value="Presensi Kegiatan">Presensi Kegiatan</option>
+              <option value="malam">Malam</option>
+              <option value="subuh">Subuh</option>
+              <option value="kegiatan">Kegiatan</option>
             </select>
           </div>
 
@@ -122,9 +80,11 @@ export default function MahasiswaRiwayatPage() {
               className="text-xs p-2 bg-[#FAF8FF] border border-[#E2E8F0] rounded-lg font-medium text-[#131B2E]"
             >
               <option value="all">Semua Status</option>
-              <option value="Disetujui">Disetujui</option>
-              <option value="Menunggu">Menunggu</option>
-              <option value="Ditolak">Ditolak</option>
+              <option value="hadir">Hadir</option>
+              <option value="terlambat">Terlambat</option>
+              <option value="izin">Izin</option>
+              <option value="sakit">Sakit</option>
+              <option value="alfa">Alpha</option>
             </select>
           </div>
         </div>
@@ -133,6 +93,9 @@ export default function MahasiswaRiwayatPage() {
           Menampilkan <span className="font-bold text-[#131B2E]">{filtered.length}</span> catatan
         </div>
       </div>
+
+      {loading && <div className="text-sm text-[#6F7A6E]">Memuat riwayat presensi...</div>}
+      {error && <div role="alert" className="rounded-xl border border-[#FECDD3] bg-[#FFF1F2] px-4 py-3 text-sm text-[#BE123C]">Gagal mengambil riwayat: {error}</div>}
 
       {/* Table */}
       <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-xs overflow-hidden">
@@ -161,17 +124,17 @@ export default function MahasiswaRiwayatPage() {
                     {item.lokasi}
                   </td>
                   <td className="px-6 py-4">
-                    {item.status === "Disetujui" ? (
+                    {item.status === "hadir" ? (
                       <span className="px-2.5 py-1 bg-[#ECFDF5] text-[#15803D] text-[11px] font-semibold rounded-full border border-[#A7F3D0]">
-                        ✓ Disetujui
+                        ✓ Hadir
                       </span>
-                    ) : item.status === "Menunggu" ? (
+                    ) : item.status === "izin" || item.status === "sakit" ? (
                       <span className="px-2.5 py-1 bg-[#FFFBEB] text-[#B45309] text-[11px] font-semibold rounded-full border border-[#FDE68A]">
-                        ⏳ Menunggu
+                        ! {item.status}
                       </span>
                     ) : (
                       <span className="px-2.5 py-1 bg-[#FFF1F2] text-[#BE123C] text-[11px] font-semibold rounded-full border border-[#FECDD3]">
-                        ✕ Ditolak
+                        ✕ {item.status}
                       </span>
                     )}
                   </td>

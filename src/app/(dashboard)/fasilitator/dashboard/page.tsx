@@ -2,6 +2,26 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useApi } from "@/hooks/useApi";
+import type { ApiResponse, AttendanceRecord } from "@/types/attendance";
+
+interface ActiveSession {
+  id: number;
+  nama_sesi: string;
+  tipe_sesi: string;
+  waktu_mulai: string;
+  waktu_selesai: string;
+  status: string;
+  is_aktif: boolean;
+}
+
+interface SessionRecap {
+  tanggal: string;
+  sesi: string;
+  total_sudah_absen: number;
+  total_belum_absen: number;
+  sudah_absen: AttendanceRecord[];
+}
 
 interface VerificationItem {
   id: string;
@@ -16,63 +36,19 @@ interface VerificationItem {
 }
 
 export default function FasilitatorDashboardPage() {
-  const [queue, setQueue] = useState<VerificationItem[]>([
-    {
-      id: "VERIF-01",
-      nama: "Muhammad Afiq",
-      nim: "2211523011",
-      gedung: "Gedung A",
-      kamar: "204",
-      tipe: "Presensi Masuk",
-      waktu: "17:40 WIB",
-      keterangan: "Kembali dari kegiatan praktikum laboratorium.",
-      status: "Menunggu",
-    },
-    {
-      id: "VERIF-02",
-      nama: "Rifqi Pratama",
-      nim: "2211522045",
-      gedung: "Gedung B",
-      kamar: "108",
-      tipe: "Presensi Kegiatan",
-      waktu: "19:35 WIB",
-      keterangan: "Kajian Rutin Malam Jumat di Masjid Asrama.",
-      status: "Menunggu",
-    },
-    {
-      id: "VERIF-03",
-      nama: "Fajar Maulana",
-      nim: "2211521019",
-      gedung: "Gedung A",
-      kamar: "312",
-      tipe: "Presensi Masuk",
-      waktu: "21:55 WIB",
-      keterangan: "Kembali menjelang jam malam (22:00 WIB).",
-      status: "Menunggu",
-    },
-    {
-      id: "VERIF-04",
-      nama: "Dinda Rahmawati",
-      nim: "2211523088",
-      gedung: "Gedung Putri C",
-      kamar: "201",
-      tipe: "Presensi Keluar",
-      waktu: "07:20 WIB",
-      keterangan: "Izin kuliah pagi ke Gedung FTI.",
-      status: "Menunggu",
-    },
-  ]);
+  const [queue, setQueue] = useState<VerificationItem[]>([]);
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: activeResponse, loading: activeLoading, error: activeError } = useApi<ApiResponse<ActiveSession[]>>("/api/fasil/sesi/aktif");
+  const { data: recapResponse, loading: recapLoading, error: recapError } = useApi<ApiResponse<SessionRecap>>(`/api/fasil/presensi/sesi?sesi=malam&tanggal=${today}`);
+  const activeSessions = activeResponse?.data ?? [];
+  const recap = recapResponse?.data;
 
   const handleApprove = (id: string) => {
-    setQueue((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, status: "Disetujui" } : item))
-    );
+    setQueue((previous) => previous.map((item) => item.id === id ? { ...item, status: "Disetujui" } : item));
   };
 
   const handleReject = (id: string) => {
-    setQueue((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, status: "Ditolak" } : item))
-    );
+    setQueue((previous) => previous.map((item) => item.id === id ? { ...item, status: "Ditolak" } : item));
   };
 
   const pendingCount = queue.filter((i) => i.status === "Menunggu").length;
@@ -100,8 +76,8 @@ export default function FasilitatorDashboardPage() {
             >
               Selamat Bertugas, Pembina Asrama!
             </h1>
-            <p className="text-white/80 text-xs sm:text-sm max-w-xl leading-relaxed">
-              Pantau kepatuhan kehadiran, verifikasi bukti foto absensi mahasiswa secara manual (FR-04), dan kelola jadwal kegiatan asrama.
+            <p className="text-white/80 text-sm sm:text-sm">
+              Pantau kehadiran hari ini dan kelola sesi absensi asrama dari satu tempat.
             </p>
           </div>
 
@@ -118,7 +94,7 @@ export default function FasilitatorDashboardPage() {
                 className="text-sm font-bold text-white tracking-tight"
                 data-ui-style="ui-style-16is3ud"
               >
-                {pendingCount} Foto Menunggu
+                {activeLoading ? "Memuat sesi aktif..." : `${activeSessions.length} Sesi Aktif`}
               </span>
             </div>
           </div>
@@ -129,26 +105,26 @@ export default function FasilitatorDashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <div className="bg-white p-5 rounded-2xl border border-[#E2E8F0] shadow-xs">
           <span className="text-xs font-medium text-[#6F7A6E]">Total Penghuni Asrama</span>
-          <div className="text-2xl sm:text-3xl font-bold text-[#131B2E] mt-1 font-mono">342</div>
-          <span className="text-[11px] text-[#6F7A6E]">Gedung A, B, C, D</span>
+          <div className="text-2xl sm:text-3xl font-bold text-[#131B2E] mt-1 font-mono">-</div>
+          <span className="text-[11px] text-[#6F7A6E]">Data penghuni belum tersedia</span>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-[#E2E8F0] shadow-xs">
           <span className="text-xs font-medium text-[#6F7A6E]">Hadir di Asrama Hari Ini</span>
-          <div className="text-2xl sm:text-3xl font-bold text-[#15803D] mt-1 font-mono">318</div>
-          <span className="text-[11px] text-[#15803D] font-medium">93.0% Tingkat Kepatuhan</span>
+          <div className="text-2xl sm:text-3xl font-bold text-[#15803D] mt-1 font-mono">{recapLoading ? "..." : recap?.total_sudah_absen ?? 0}</div>
+          <span className="text-[11px] text-[#15803D] font-medium">Mahasiswa sudah absen sesi malam</span>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-[#E2E8F0] shadow-xs">
           <span className="text-xs font-medium text-[#6F7A6E]">Menunggu Verifikasi Manual</span>
-          <div className="text-2xl sm:text-3xl font-bold text-[#B45309] mt-1 font-mono">14</div>
-          <span className="text-[11px] text-[#B45309] font-medium">Foto bukti perlu ditinjau</span>
+          <div className="text-2xl sm:text-3xl font-bold text-[#B45309] mt-1 font-mono">{recapLoading ? "..." : recap?.total_belum_absen ?? 0}</div>
+          <span className="text-[11px] text-[#B45309] font-medium">Belum absen sesi malam</span>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-[#E2E8F0] shadow-xs">
           <span className="text-xs font-medium text-[#6F7A6E]">Izin / Tidak Hadir</span>
-          <div className="text-2xl sm:text-3xl font-bold text-[#0369A1] mt-1 font-mono">10</div>
-          <span className="text-[11px] text-[#0369A1] font-medium">Izin pulang / sakit</span>
+          <div className="text-2xl sm:text-3xl font-bold text-[#0369A1] mt-1 font-mono">{activeSessions.length}</div>
+          <span className="text-[11px] text-[#0369A1] font-medium">Sesi sedang aktif</span>
         </div>
       </div>
 
@@ -183,6 +159,8 @@ export default function FasilitatorDashboardPage() {
 
           {/* Verification Cards List */}
           <div className="p-6 flex flex-col gap-4">
+            {(activeError || recapError) && <div role="alert" className="rounded-xl border border-[#FECDD3] bg-[#FFF1F2] px-4 py-3 text-sm text-[#BE123C]">Data dashboard tidak dapat dimuat: {activeError ?? recapError}</div>}
+            {queue.length === 0 && <div className="rounded-xl border border-dashed border-[#C9D2C5] px-4 py-8 text-center text-sm text-[#6F7A6E]">Belum ada antrean verifikasi foto yang tersedia dari server.</div>}
             {queue.map((item) => (
               <div
                 key={item.id}

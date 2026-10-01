@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface MenuItem {
   name: string;
@@ -16,12 +16,33 @@ interface SidebarProps {
   onCloseMobile?: () => void;
 }
 
+interface StoredUser {
+  nama?: string;
+  nim?: string;
+  email?: string;
+  role?: string;
+}
+
 export default function Sidebar({ onCloseMobile }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const role = pathname.startsWith("/fasilitator") ? "fasilitator" : "mahasiswa";
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [storedUser, setStoredUser] = useState<StoredUser | null>(null);
+
+  useEffect(() => {
+    const rawUser = localStorage.getItem("user");
+    if (!rawUser) return;
+
+    try {
+      const parsedUser = JSON.parse(rawUser) as StoredUser;
+      const timer = window.setTimeout(() => setStoredUser(parsedUser), 0);
+      return () => window.clearTimeout(timer);
+    } catch {
+      localStorage.removeItem("user");
+    }
+  }, []);
 
   // Mahasiswa Menu according to PRD (FR-01, FR-02/03 Absen Foto, FR-07 Riwayat)
   const mahasiswaMenus: MenuItem[] = [
@@ -74,7 +95,6 @@ export default function Sidebar({ onCloseMobile }: SidebarProps) {
     {
       name: "Verifikasi Presensi",
       href: "/fasilitator/verifikasi",
-      badge: "14",
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
@@ -119,15 +139,34 @@ export default function Sidebar({ onCloseMobile }: SidebarProps) {
         </svg>
       ),
     },
+    {
+      name: "Manajemen Pengguna",
+      href: "/fasilitator/pengguna",
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <line x1="19" y1="8" x2="19" y2="14" />
+          <line x1="22" y1="11" x2="16" y2="11" />
+        </svg>
+      ),
+    },
   ];
 
-  const currentMenus = role === "fasilitator" ? fasilitatorMenus : mahasiswaMenus;
+  const currentMenus = role === "fasilitator"
+    ? fasilitatorMenus.filter((item) => item.href !== "/fasilitator/pengguna" || storedUser?.role === "admin")
+    : mahasiswaMenus;
 
   const handleLogout = () => {
     localStorage.removeItem("access_token");
     localStorage.removeItem("user");
+    onCloseMobile?.();
     router.push("/login");
   };
+
+  const displayName = storedUser?.nama || (role === "fasilitator" ? "Fasilitator" : "Mahasiswa");
+  const displayIdentifier = storedUser?.nim || storedUser?.email || (role === "fasilitator" ? "Portal Fasilitator" : "Portal Mahasiswa");
+  const initials = displayName.split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 
   return (
     <aside
@@ -210,18 +249,18 @@ export default function Sidebar({ onCloseMobile }: SidebarProps) {
           aria-expanded={showProfileMenu}
           aria-haspopup="menu"
           aria-label="Buka menu akun"
-          className="flex w-full items-center gap-3 text-left transition-colors hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#76B900]"
+          className="flex min-h-11 w-full items-center gap-3 rounded-lg text-left transition-colors hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#76B900]"
           data-ui-style="ui-style-3u9dyp"
         >
           <div className={`sidebar-avatar ${role === "fasilitator" ? "sidebar-avatar--fasilitator" : ""}`}>
-            {role === "fasilitator" ? "FS" : "AF"}
+            {initials || (role === "fasilitator" ? "FS" : "MHS")}
           </div>
           <span className="min-w-0 flex-1">
             <span className="block truncate" data-ui-style="ui-style-1msccub">
-              {role === "fasilitator" ? "Ahmad Fauzi" : "Afiq"}
+              {displayName}
             </span>
             <span className="block truncate" data-ui-style="ui-style-3p5hkc">
-              {role === "fasilitator" ? "Pembina Asrama" : "2211523011"}
+              {displayIdentifier}
             </span>
           </span>
           <svg className={`h-4 w-4 flex-shrink-0 text-[#DDE5D6] transition-transform ${showProfileMenu ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -234,7 +273,7 @@ export default function Sidebar({ onCloseMobile }: SidebarProps) {
             <Link
               href={role === "fasilitator" ? "/fasilitator/dashboard" : "/mahasiswa/dashboard"}
               onClick={() => setShowProfileMenu(false)}
-              className="flex items-center gap-2 px-4 py-2.5 text-xs font-medium text-[#E6E9E7] transition-colors hover:bg-white/10"
+              className="flex min-h-11 items-center gap-2 px-4 py-2.5 text-xs font-medium text-[#E6E9E7] transition-colors hover:bg-white/10"
               role="menuitem"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -245,7 +284,7 @@ export default function Sidebar({ onCloseMobile }: SidebarProps) {
             <button
               type="button"
               onClick={() => { setShowProfileMenu(false); setShowLogoutDialog(true); }}
-              className="flex w-full items-center gap-2 border-t border-white/10 px-4 py-2.5 text-left text-xs font-medium text-[#FFB4AB] transition-colors hover:bg-white/10"
+              className="flex min-h-11 w-full items-center gap-2 border-t border-white/10 px-4 py-2.5 text-left text-xs font-medium text-[#FFB4AB] transition-colors hover:bg-white/10"
               role="menuitem"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -260,15 +299,26 @@ export default function Sidebar({ onCloseMobile }: SidebarProps) {
       </div>
 
       {showLogoutDialog && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="logout-title">
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
-            <h2 id="logout-title" className="text-lg font-bold text-[#191C1B]">Keluar dari akun?</h2>
-            <p className="mt-2 text-sm leading-5 text-[#596155]">
-              Anda akan keluar dari portal dan perlu masuk kembali untuk melanjutkan.
-            </p>
-            <div className="mt-6 flex justify-end gap-3">
-              <button type="button" onClick={() => setShowLogoutDialog(false)} className="rounded-lg px-4 py-2 text-sm font-semibold text-[#3E4A38] hover:bg-[#F2F4F2]">Batal</button>
-              <button type="button" onClick={handleLogout} className="rounded-lg bg-[#BA1A1A] px-4 py-2 text-sm font-semibold text-white hover:bg-[#93000A]">Keluar</button>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0B1710]/65 p-4" role="dialog" aria-modal="true" aria-labelledby="logout-title" aria-describedby="logout-description">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-[#DDE5D6] bg-white shadow-2xl">
+            <div className="flex items-start gap-4 border-b border-[#E8ECE6] px-6 py-5">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#FFF1F2] text-[#BA1A1A]" aria-hidden="true">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <h2 id="logout-title" className="text-lg font-bold text-[#191C1B]">Keluar dari sesi?</h2>
+                <p id="logout-description" className="mt-1 text-sm leading-5 text-[#596155]">
+                  Sesi Anda akan diakhiri. Anda perlu login kembali untuk mengakses portal SIMAS UNAND.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col-reverse gap-3 bg-[#FAFCF9] px-6 py-4 sm:flex-row sm:justify-end">
+              <button type="button" onClick={() => setShowLogoutDialog(false)} className="min-h-11 rounded-lg border border-[#C9D2C5] px-4 py-2 text-sm font-semibold text-[#3E4A38] transition-colors hover:bg-[#F2F4F2] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#76B900]">Tetap di sini</button>
+              <button type="button" onClick={handleLogout} className="min-h-11 rounded-lg bg-[#BA1A1A] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#93000A] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#BA1A1A] focus-visible:ring-offset-2">Keluar sesi</button>
             </div>
           </div>
         </div>
