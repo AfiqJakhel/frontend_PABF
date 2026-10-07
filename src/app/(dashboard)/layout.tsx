@@ -38,7 +38,7 @@ export default function DashboardLayout({
       {/* Main Layout Area (offset by 288px on desktop) */}
       <div className="flex-1 flex flex-col lg:pl-[288px] min-w-0 min-h-screen">
         <Navbar onToggleMobileMenu={() => setMobileMenuOpen(true)} />
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1280px] w-full mx-auto">
+        <main className="flex-1 w-full min-h-[calc(100vh-4rem)] p-4 sm:p-6 lg:p-8 max-w-[1720px] mx-auto">
           {children}
         </main>
       </div>

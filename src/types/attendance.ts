@@ -2,6 +2,7 @@ export interface ApiResponse<T> {
   success: boolean;
   message: string;
   data: T | null;
+  errors?: Record<string, string[]> | null;
 }
 
 export type AttendanceStatus = "hadir" | "terlambat" | "alfa" | "izin" | "sakit";
@@ -16,6 +17,8 @@ export interface AttendanceRecord {
   sesi: string;
   latitude?: number | null;
   longitude?: number | null;
+  accuracy?: number | null;
+  area_absensi_id?: number | null;
   status: AttendanceStatus;
   foto_wajah?: string | null;
   keterangan?: string | null;
@@ -49,4 +52,19 @@ export interface AttendanceSummaryData {
   sesi: string;
   summary: AttendanceSummaryItem[];
   total_mahasiswa: number;
+}
+
+export interface SubmitAbsensiResponseData {
+  id: number;
+  presensi_id?: number;
+  status: AttendanceStatus;
+  waktu: string;
+  tanggal?: string;
+  sesi: string;
+  area_nama: string;
+  foto_wajah?: string;
+  foto_url?: string;
+  accuracy?: number | null;
+  location_valid: boolean;
+  keterangan?: string | null;
 }

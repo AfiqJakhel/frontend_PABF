@@ -136,158 +136,125 @@ export default function MahasiswaDashboardPage() {
             <span className="mhs-header__location-text">Kamar 204</span>
           </div>
         </div>
-
-        {/* Date Pill with real-time Indonesian date */}
-        <div className="mhs-header__actions">
-          <div className="mhs-date-pill">
-            <svg width="14" height="15" viewBox="0 0 24 24" fill="none" stroke="#1B6D00" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-            </svg>
-            <span className="mhs-date-pill__text">{formattedDatePill}</span>
-          </div>
-        </div>
       </div>
 
       {/* ── Section 2: Presensi Hari Ini Section ── */}
       <div className="mhs-section">
         <div className="mhs-section__header">
-          <h2 className="mhs-section__title">Presensi Hari Ini</h2>
+          <h2 className="ui-section-title">Presensi Hari Ini</h2>
         </div>
 
         <div className="mhs-cards-grid">
-          {/* Card 1: Presensi Masuk (Sudah Absen) */}
-          <div className="mhs-card">
-            <div className="mhs-card__top">
-              <div className="mhs-card__info">
-                <div className="mhs-icon-box mhs-icon-box--green">
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#1B6D00" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                </div>
-                <div className="mhs-card__text-col">
-                  <span className="mhs-card__label">PRESENSI MASUK</span>
-                  <span className="mhs-card__value">{firstTodayRecord ? new Intl.DateTimeFormat("id-ID", { timeStyle: "short" }).format(new Date(firstTodayRecord.waktu)) : "Belum Absen"}</span>
-                </div>
+          {/* Card 1: Presensi Masuk */}
+          <div className="p-5 bg-white rounded-xl border border-[#e2e8f0] flex flex-col justify-between gap-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <span className="text-xs font-semibold uppercase tracking-wider text-[#6f7a6e] block mb-1">
+                  Presensi Masuk (Subuh)
+                </span>
+                <span className="text-xl sm:text-2xl font-bold font-mono text-[#131b2e]">
+                  {firstTodayRecord ? new Intl.DateTimeFormat("id-ID", { timeStyle: "short" }).format(new Date(firstTodayRecord.waktu)) : "Belum Absen"}
+                </span>
               </div>
 
-              <div className="mhs-badge mhs-badge--green">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#155B00" strokeWidth="2.5">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                <span>{firstTodayRecord ? firstTodayRecord.status.toUpperCase() : "BELUM ABSEN"}</span>
-              </div>
+              <span
+                className={`text-xs font-semibold px-2.5 py-1 rounded-md border ${
+                  firstTodayRecord
+                    ? "bg-[#ecfdf5] text-[#15803d] border-[#a7f3d0]"
+                    : "bg-[#f1f5f9] text-[#64748b] border-[#cbd5e1]"
+                }`}
+              >
+                {firstTodayRecord ? firstTodayRecord.status.toUpperCase() : "BELUM ABSEN"}
+              </span>
             </div>
 
-            <div className="mhs-card__bottom">
-              <span className="mhs-card__meta">Pintu Masuk Gedung A</span>
-              <div className="mhs-card__meta-status">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1B6D00" strokeWidth="2">
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                  <polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
-                <span className="mhs-card__meta">Terverifikasi Admin</span>
-              </div>
+            <div className="pt-3 border-t border-[#f1f5f9] flex items-center justify-between text-xs text-[#6f7a6e]">
+              <span>Pintu Masuk Gedung A</span>
+              <span>{firstTodayRecord ? "Tervalidasi" : "Menunggu presensi"}</span>
             </div>
           </div>
 
-          {/* Card 2: Presensi Malam (Belum Absen - Active State) */}
-          <div className="mhs-card mhs-card--active">
-            <div className="mhs-card__top">
-              <div className="mhs-card__info">
-                <div className="mhs-icon-box mhs-icon-box--amber">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#904D00" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10" />
-                    <polyline points="12 6 12 12 16 14" />
-                  </svg>
-                </div>
-                <div className="mhs-card__text-col">
-                  <span className="mhs-card__label">PRESENSI MALAM</span>
-                  <span className="mhs-card__value">{nightRecord ? new Intl.DateTimeFormat("id-ID", { timeStyle: "short" }).format(new Date(nightRecord.waktu)) : "Belum Absen"}</span>
-                </div>
+          {/* Card 2: Presensi Malam */}
+          <div className="p-5 bg-white rounded-xl border border-[#e2e8f0] flex flex-col justify-between gap-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <span className="text-xs font-semibold uppercase tracking-wider text-[#6f7a6e] block mb-1">
+                  Presensi Malam
+                </span>
+                <span className="text-xl sm:text-2xl font-bold font-mono text-[#131b2e]">
+                  {nightRecord ? new Intl.DateTimeFormat("id-ID", { timeStyle: "short" }).format(new Date(nightRecord.waktu)) : "Belum Absen"}
+                </span>
               </div>
 
-              <div className="mhs-badge mhs-badge--amber">
-                <span className="mhs-dot mhs-dot--amber" />
-                <span>BELUM ABSEN</span>
-              </div>
+              <span
+                className={`text-xs font-semibold px-2.5 py-1 rounded-md border ${
+                  nightRecord
+                    ? "bg-[#ecfdf5] text-[#15803d] border-[#a7f3d0]"
+                    : "bg-[#fffbeb] text-[#b45309] border-[#fde68a]"
+                }`}
+              >
+                {nightRecord ? nightRecord.status.toUpperCase() : "BELUM ABSEN"}
+              </span>
             </div>
 
-            <div className="mhs-card__bottom">
-              <span className="mhs-card__meta">Batas Jam Malam: 22:00 WIB</span>
-              <Link href="/mahasiswa/presensi" className="mhs-btn-absen">
-                <svg width="15" height="14" viewBox="0 0 24 24" fill="none" stroke="#042100" strokeWidth="2.2">
-                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                  <circle cx="12" cy="13" r="4" />
-                </svg>
-                <span>Absen Sekarang</span>
-              </Link>
+            <div className="pt-3 border-t border-[#f1f5f9] flex items-center justify-between gap-2">
+              <span className="text-xs text-[#6f7a6e]">Batas: 22:00 WIB</span>
+              {!nightRecord && (
+                <Link href="/mahasiswa/presensi" className="ui-btn-primary text-xs !py-1.5 !min-h-[32px]">
+                  Absen Sekarang
+                </Link>
+              )}
             </div>
           </div>
         </div>
       </div>
 
       {/* ── Section 3: Monthly Attendance Calendar Widget ── */}
-      <div className="mhs-calendar-card">
-        <div className="mhs-calendar-header">
-          <div className="mhs-calendar-title-box">
-            <div className="mhs-calendar-icon">
-              <svg width="16" height="17" viewBox="0 0 24 24" fill="none" stroke="#191C1B" strokeWidth="2">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                <line x1="16" y1="2" x2="16" y2="6" />
-                <line x1="8" y1="2" x2="8" y2="6" />
-                <line x1="3" y1="10" x2="21" y2="10" />
-              </svg>
-            </div>
-
-            <div className="mhs-calendar-title-col">
-              <h2 className="mhs-section__title">Kalender Kehadiran</h2>
-              <div className="mhs-month-selector">
-                <button
-                  type="button"
-                  onClick={handlePrevMonth}
-                  className="mhs-month-btn"
-                  title="Bulan Sebelumnya"
-                  aria-label="Bulan sebelumnya"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <polyline points="15 18 9 12 15 6" />
-                  </svg>
-                </button>
-                <select
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                  className="mhs-month-select"
-                >
-                  {monthNames.map((m, idx) => (
-                    <option key={m} value={idx}>
-                      {m} {selectedYear}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={handleNextMonth}
-                  className="mhs-month-btn"
-                  title="Bulan Selanjutnya"
-                  aria-label="Bulan selanjutnya"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <polyline points="9 18 15 12 9 6" />
-                  </svg>
-                </button>
-              </div>
+      <div className="bg-white rounded-xl border border-[#e2e8f0] p-5 sm:p-6 flex flex-col gap-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#e2e8f0]">
+          <div className="flex flex-col gap-1">
+            <h2 className="ui-section-title">Kalender Kehadiran</h2>
+            <div className="flex items-center gap-2 mt-1">
+              <button
+                type="button"
+                onClick={handlePrevMonth}
+                className="w-8 h-8 flex items-center justify-center rounded-md border border-[#d0d7de] hover:bg-[#f8fafc] text-sm cursor-pointer"
+                title="Bulan Sebelumnya"
+                aria-label="Bulan sebelumnya"
+              >
+                ‹
+              </button>
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                className="h-8 px-2 bg-white border border-[#d0d7de] rounded-md text-xs sm:text-sm font-semibold text-[#131b2e] outline-none cursor-pointer"
+              >
+                {monthNames.map((m, idx) => (
+                  <option key={m} value={idx}>
+                    {m} {selectedYear}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleNextMonth}
+                className="w-8 h-8 flex items-center justify-center rounded-md border border-[#d0d7de] hover:bg-[#f8fafc] text-sm cursor-pointer"
+                title="Bulan Selanjutnya"
+                aria-label="Bulan selanjutnya"
+              >
+                ›
+              </button>
             </div>
           </div>
 
-          <div className="mhs-summary-pill">
-            <span className="mhs-summary-item mhs-summary-item--green">Hadir: 24</span>
-            <span className="mhs-summary-sep">•</span>
-            <span className="mhs-summary-item mhs-summary-item--amber">Izin: 1</span>
-            <span className="mhs-summary-sep">•</span>
-            <span className="mhs-summary-item mhs-summary-item--red">Alpha: 0</span>
-            <span className="mhs-summary-sep">•</span>
-            <span className="mhs-summary-item mhs-summary-item--bold">96.8%</span>
+          <div className="flex items-center gap-3 text-xs font-semibold px-3 py-1.5 bg-[#f8fafc] rounded-lg border border-[#e2e8f0]">
+            <span className="text-[#15803d]">Hadir: 24</span>
+            <span className="text-[#94a3b8]">•</span>
+            <span className="text-[#b45309]">Izin: 1</span>
+            <span className="text-[#94a3b8]">•</span>
+            <span className="text-[#be123c]">Alpha: 0</span>
+            <span className="text-[#94a3b8]">•</span>
+            <span className="text-[#131b2e]">96.8%</span>
           </div>
         </div>
 
@@ -363,99 +330,62 @@ export default function MahasiswaDashboardPage() {
         </div>
 
         {/* Calendar Legend at bottom */}
-        <div className="mhs-calendar-footer">
-          <div className="mhs-legend-group">
-            <div className="mhs-legend-item">
-              <span className="mhs-legend-dot mhs-dot--green" />
-              <span>Hadir Tepat Waktu</span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-[#f1f5f9] text-xs text-[#6f7a6e]">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#15803d]" />
+              <span>Hadir</span>
             </div>
-
-            <div className="mhs-legend-item">
-              <span className="mhs-legend-dot mhs-dot--amber" />
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#b45309]" />
               <span>Izin / Terlambat</span>
             </div>
-
-            <div className="mhs-legend-item">
-              <span className="mhs-legend-dot mhs-dot--red" />
-              <span>Ditolak / Alpha</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#be123c]" />
+              <span>Alpha</span>
             </div>
-
-            <div className="mhs-legend-item">
-              <span className="mhs-legend-ring" />
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full border border-[#00652c]" />
               <span>Hari Ini</span>
             </div>
           </div>
 
-          <Link href="/mahasiswa/riwayat" className="mhs-history-link">
-            <span>Lihat Riwayat Lengkap</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
+          <Link href="/mahasiswa/riwayat" className="text-xs font-semibold text-[#00652c] hover:underline">
+            Lihat Riwayat Lengkap →
           </Link>
         </div>
       </div>
 
       {/* ── Section 4: Agenda Kegiatan Terjadwal ── */}
-      <div className="mhs-section">
-        <div className="mhs-section__header">
-          <div className="mhs-section__title-col">
-            <h2 className="mhs-section__title">Kegiatan Asrama Terjadwal</h2>
-            <span className="mhs-section__subtitle">Wajib diikuti seluruh penghuni asrama (FR-03)</span>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between pb-2 border-b border-[#e2e8f0]">
+          <div>
+            <h2 className="ui-section-title">Kegiatan Asrama Terjadwal</h2>
+            <p className="ui-meta mt-0.5">Wajib diikuti seluruh penghuni asrama.</p>
           </div>
-
-          <div className="mhs-badge-pill">
-            <span className="mhs-badge-pill__text">2 Kegiatan</span>
-          </div>
+          <span className="text-xs font-medium text-[#6f7a6e]">2 Kegiatan</span>
         </div>
 
-        <div className="mhs-cards-grid">
-          {/* Activity 1: Selesai */}
-          <div className="mhs-activity-card">
-            <div className="mhs-activity-info">
-              <div className="mhs-icon-box mhs-icon-box--grey">
-                <svg width="18" height="14" viewBox="0 0 24 24" fill="none" stroke="#1B6D00" strokeWidth="2.5">
-                  <path d="M18 20V10" />
-                  <path d="M12 20V4" />
-                  <path d="M6 20v-6" />
-                </svg>
-              </div>
-
-              <div className="mhs-activity-text-col">
-                <h3 className="mhs-activity-title">Senam Pagi & Kebersihan</h3>
-                <span className="mhs-activity-meta">06:30 - 08:00 WIB • Lapangan Asrama</span>
-              </div>
+        <div className="bg-white rounded-xl border border-[#e2e8f0] divide-y divide-[#e2e8f0]">
+          {/* Activity 1 */}
+          <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-semibold text-[#131b2e]">Senam Pagi & Kebersihan</h3>
+              <p className="text-xs sm:text-sm text-[#6f7a6e] mt-0.5">06:30 - 08:00 WIB • Lapangan Asrama</p>
             </div>
-
-            <div className="mhs-badge mhs-badge--green">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#155B00" strokeWidth="2.5">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              <span>SELESAI</span>
-            </div>
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-[#ecfdf5] text-[#15803d] border border-[#a7f3d0] self-start sm:self-auto">
+              SELESAI
+            </span>
           </div>
 
-          {/* Activity 2: Absen Sekarang */}
-          <div className="mhs-activity-card">
-            <div className="mhs-activity-info">
-              <div className="mhs-icon-box mhs-icon-box--amber">
-                <svg width="16" height="18" viewBox="0 0 24 24" fill="none" stroke="#904D00" strokeWidth="2">
-                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-                </svg>
-              </div>
-
-              <div className="mhs-activity-text-col">
-                <h3 className="mhs-activity-title">Kajian Rutin & Bina Karakter</h3>
-                <span className="mhs-activity-meta">19:30 - 21:00 WIB • Masjid Asrama</span>
-              </div>
+          {/* Activity 2 */}
+          <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-semibold text-[#131b2e]">Kajian Rutin & Bina Karakter</h3>
+              <p className="text-xs sm:text-sm text-[#6f7a6e] mt-0.5">19:30 - 21:00 WIB • Masjid Asrama</p>
             </div>
-
-            <Link href="/mahasiswa/presensi" className="mhs-btn-dark">
-              <svg width="14" height="13" viewBox="0 0 24 24" fill="none" stroke="#5EDA39" strokeWidth="2.2">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                <circle cx="12" cy="13" r="4" />
-              </svg>
-              <span>Absen Sekarang</span>
+            <Link href="/mahasiswa/presensi" className="ui-btn-primary text-xs self-start sm:self-auto">
+              Absen Sekarang
             </Link>
           </div>
         </div>

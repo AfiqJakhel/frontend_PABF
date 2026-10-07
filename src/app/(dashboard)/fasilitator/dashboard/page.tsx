@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useApi } from "@/hooks/useApi";
-import type { ApiResponse, AttendanceRecord } from "@/types/attendance";
+import { api } from "@/lib/apiClient";
+import type { ApiResponse } from "@/types/attendance";
 
 interface ActiveSession {
   id: number;
@@ -15,298 +15,354 @@ interface ActiveSession {
   is_aktif: boolean;
 }
 
-interface SessionRecap {
-  tanggal: string;
-  sesi: string;
-  total_sudah_absen: number;
-  total_belum_absen: number;
-  sudah_absen: AttendanceRecord[];
+interface GedungData {
+  id: number;
+  nama_gedung: string;
+  total_kamar: number;
+  daftar_kamar: Array<{
+    id: number;
+    nomor_kamar: string;
+    lantai: number;
+    total_penghuni: number;
+  }>;
 }
 
-interface VerificationItem {
-  id: string;
-  nama: string;
-  nim: string;
-  gedung: string;
-  kamar: string;
-  tipe: string;
-  waktu: string;
-  keterangan: string;
-  status: "Menunggu" | "Disetujui" | "Ditolak";
+interface KegiatanItem {
+  id: number;
+  nama_sesi: string;
+  tipe_sesi: string;
+  tanggal: string | null;
+  waktu_mulai: string | null;
+  waktu_selesai: string | null;
+  status: string;
+  is_aktif: boolean;
+  nama_fasilitator?: string | null;
+  keterangan?: string | null;
 }
 
 export default function FasilitatorDashboardPage() {
-  const [queue, setQueue] = useState<VerificationItem[]>([]);
-  const today = new Date().toISOString().slice(0, 10);
-  const { data: activeResponse, loading: activeLoading, error: activeError } = useApi<ApiResponse<ActiveSession[]>>("/api/fasil/sesi/aktif");
-  const { data: recapResponse, loading: recapLoading, error: recapError } = useApi<ApiResponse<SessionRecap>>(`/api/fasil/presensi/sesi?sesi=malam&tanggal=${today}`);
-  const activeSessions = activeResponse?.data ?? [];
-  const recap = recapResponse?.data;
+  const [gedung, setGedung] = useState<GedungData | null>(null);
+  const [totalMahasiswa, setTotalMahasiswa] = useState<number>(0);
+  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
+  const [kegiatanList, setKegiatanList] = useState<KegiatanItem[]>([]);
+  const [todayRecap, setTodayRecap] = useState<{ sudah: number; belum: number }>({ sudah: 0, belum: 0 });
+  const [loading, setLoading] = useState<boolean>(true);
 
-  const handleApprove = (id: string) => {
-    setQueue((previous) => previous.map((item) => item.id === id ? { ...item, status: "Disetujui" } : item));
-  };
+  useEffect(() => {
+    async function loadDashboardData() {
+      try {
+        setLoading(true);
+        // 1. Gedung Saya
+        const resGedung = await api.get<{ success: boolean; data: GedungData }>("/api/fasil/gedung-saya");
+        if (resGedung?.data) {
+          setGedung(resGedung.data);
+        }
 
-  const handleReject = (id: string) => {
-    setQueue((previous) => previous.map((item) => item.id === id ? { ...item, status: "Ditolak" } : item));
-  };
+        // 2. Total Mahasiswa Binaan
+        const resMhs = await api.get<{ success: boolean; data: { total: number } }>("/api/fasil/mahasiswa");
+        if (resMhs?.data) {
+          setTotalMahasiswa(resMhs.data.total);
+        }
 
-  const pendingCount = queue.filter((i) => i.status === "Menunggu").length;
+        // 3. Sesi Aktif
+        const resSesi = await api.get<ApiResponse<ActiveSession[]>>("/api/fasil/sesi/aktif");
+        if (resSesi?.data) {
+          setActiveSessions(resSesi.data);
+        }
+
+        // 4. Kegiatan Terbaru (sesi/kegiatan yang dibuat, terbaru lebih dulu)
+        const resKegiatan = await api.get<{
+          success: boolean;
+          data: { items: KegiatanItem[]; total: number };
+        }>("/api/fasil/sesi?per_page=6");
+        if (resKegiatan?.data?.items) {
+          setKegiatanList(resKegiatan.data.items);
+        }
+
+        // 5. Rekap Presensi Sesi Hari Ini
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const resRekap = await api.get<{
+          success: boolean;
+          data: { total_sudah_absen: number; total_belum_absen: number };
+        }>(`/api/fasil/presensi/sesi?sesi=subuh&tanggal=${todayStr}`);
+        if (resRekap?.data) {
+          setTodayRecap({
+            sudah: resRekap.data.total_sudah_absen,
+            belum: resRekap.data.total_belum_absen,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to load facilitator dashboard data:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadDashboardData();
+  }, []);
 
   return (
-    <div className="flex flex-col gap-6 sm:gap-8 pb-12 w-full">
-      {/* Header Banner */}
-      <div
-        className="rounded-2xl p-6 sm:p-8 text-white shadow-sm w-full relative overflow-hidden"
-        data-ui-style="ui-style-1x2bw8j"
+    <div className="flex flex-col gap-8 pb-16 w-full">
+      {/* ── Hero Section ── */}
+      <section
+        aria-labelledby="dashboard-hero-title"
+        className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0B2115] via-[#0f2e1c] to-[#00652c] text-white px-6 py-8 sm:px-8 sm:py-10 lg:px-10"
       >
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 w-full relative z-10">
-          <div className="flex flex-col gap-2 flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-white/15 text-[#95F8A7] tracking-wide">
-                Panel Pembina & Fasilitator Asrama
+        {/* Subtle background glow (decorative, hidden from assistive tech) */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#76b900]/15 blur-3xl"
+        />
+
+        <div className="relative flex flex-col lg:flex-row lg:items-end justify-between gap-8">
+          <div className="max-w-3xl">
+            <div className="flex items-center gap-2.5 mb-4 flex-wrap">
+              <span className="text-xs font-semibold tracking-wider uppercase text-[#a3e635]">
+                Fasilitator Asrama
               </span>
-              <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#81FE5A]/20 text-[#81FE5A] border border-[#81FE5A]/40">
-                UPT Asrama Universitas Andalas
-              </span>
+              {gedung && (
+                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-white/10 text-white border border-white/15">
+                  {gedung.nama_gedung}
+                </span>
+              )}
             </div>
+
             <h1
-              className="text-2xl sm:text-3xl font-bold tracking-tight text-white m-0"
-              data-ui-style="ui-style-vinz70"
+              id="dashboard-hero-title"
+              className="font-bold tracking-tight text-white text-[clamp(1.75rem,1.3rem+1.8vw,2.5rem)] leading-tight"
             >
-              Selamat Bertugas, Pembina Asrama!
+              Selamat Bertugas, Fasilitator!
             </h1>
-            <p className="text-white/80 text-sm sm:text-sm">
-              Pantau kehadiran hari ini dan kelola sesi absensi asrama dari satu tempat.
-            </p>
           </div>
 
-          {/* Quick Verification Alert */}
-          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-5 py-3.5 flex items-center gap-3.5 flex-shrink-0">
-            <div className="w-10 h-10 rounded-lg bg-[#FECDD3] text-[#BE123C] flex items-center justify-center flex-shrink-0 font-bold">
-              {pendingCount}
+          {/* Real-time Session Status */}
+          <div className="flex items-center gap-4 self-start lg:self-auto rounded-xl bg-white/[0.07] border border-white/15 px-5 py-4 backdrop-blur-sm">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[#76b900] text-[#0B2115] text-xl font-bold">
+              {activeSessions.length}
             </div>
             <div className="flex flex-col">
-              <span className="text-[11px] uppercase tracking-wider text-white/70 font-medium">
-                Antrean Verifikasi
+              <span className="text-xs font-medium uppercase tracking-wider text-white/60">
+                Status Sesi Presensi
               </span>
-              <span
-                className="text-sm font-bold text-white tracking-tight"
-                data-ui-style="ui-style-16is3ud"
-              >
-                {activeLoading ? "Memuat sesi aktif..." : `${activeSessions.length} Sesi Aktif`}
+              <span className="flex items-center gap-2 text-base font-semibold text-white">
+                <span
+                  aria-hidden="true"
+                  className={`h-2 w-2 rounded-full ${activeSessions.length > 0 ? "bg-[#a3e635] animate-pulse" : "bg-white/40"}`}
+                />
+                {activeSessions.length > 0 ? "Sesi Sedang Dibuka" : "Tidak Ada Sesi Aktif"}
               </span>
             </div>
           </div>
         </div>
+      </section>
+
+      {/* ── Section: Summary KPI Metrics ── */}
+      <div>
+        <div className="mb-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-[#6f7a6e]">
+            Ringkasan Kehadiran & Kapasitas
+          </h2>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="p-5 bg-white rounded-lg border border-[#e2e8f0] flex flex-col justify-between">
+            <span className="text-xs font-medium text-[#6f7a6e]">
+              Mahasiswa Terdaftar
+            </span>
+            <div className="ui-kpi-value text-[#131b2e] my-1.5">
+              {loading ? "..." : totalMahasiswa}
+            </div>
+            <span className="text-xs text-[#6f7a6e]">Penghuni {gedung?.nama_gedung || "Gedung"}</span>
+          </div>
+
+          <div className="p-5 bg-white rounded-lg border border-[#e2e8f0] flex flex-col justify-between">
+            <span className="text-xs font-medium text-[#6f7a6e]">
+              Total Kamar
+            </span>
+            <div className="ui-kpi-value text-[#00652c] my-1.5">
+              {loading ? "..." : gedung?.total_kamar || 0}
+            </div>
+            <span className="text-xs text-[#6f7a6e]">Kamar aktif terdata</span>
+          </div>
+
+          <div className="p-5 bg-white rounded-lg border border-[#e2e8f0] flex flex-col justify-between">
+            <span className="text-xs font-medium text-[#6f7a6e]">
+              Sudah Absen Hari Ini
+            </span>
+            <div className="ui-kpi-value text-[#15803d] my-1.5">
+              {loading ? "..." : todayRecap.sudah}
+            </div>
+            <span className="text-xs text-[#15803d] font-medium">Kehadiran tercatat</span>
+          </div>
+
+          <div className="p-5 bg-white rounded-lg border border-[#e2e8f0] flex flex-col justify-between">
+            <span className="text-xs font-medium text-[#6f7a6e]">
+              Belum Absen Hari Ini
+            </span>
+            <div className="ui-kpi-value text-[#b45309] my-1.5">
+              {loading ? "..." : todayRecap.belum}
+            </div>
+            <span className="text-xs text-[#b45309] font-medium">Perlu pemantauan</span>
+          </div>
+        </div>
       </div>
 
-      {/* KPI Cards Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        <div className="bg-white p-5 rounded-2xl border border-[#E2E8F0] shadow-xs">
-          <span className="text-xs font-medium text-[#6F7A6E]">Total Penghuni Asrama</span>
-          <div className="text-2xl sm:text-3xl font-bold text-[#131B2E] mt-1 font-mono">-</div>
-          <span className="text-[11px] text-[#6F7A6E]">Data penghuni belum tersedia</span>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-[#E2E8F0] shadow-xs">
-          <span className="text-xs font-medium text-[#6F7A6E]">Hadir di Asrama Hari Ini</span>
-          <div className="text-2xl sm:text-3xl font-bold text-[#15803D] mt-1 font-mono">{recapLoading ? "..." : recap?.total_sudah_absen ?? 0}</div>
-          <span className="text-[11px] text-[#15803D] font-medium">Mahasiswa sudah absen sesi malam</span>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-[#E2E8F0] shadow-xs">
-          <span className="text-xs font-medium text-[#6F7A6E]">Menunggu Verifikasi Manual</span>
-          <div className="text-2xl sm:text-3xl font-bold text-[#B45309] mt-1 font-mono">{recapLoading ? "..." : recap?.total_belum_absen ?? 0}</div>
-          <span className="text-[11px] text-[#B45309] font-medium">Belum absen sesi malam</span>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-[#E2E8F0] shadow-xs">
-          <span className="text-xs font-medium text-[#6F7A6E]">Izin / Tidak Hadir</span>
-          <div className="text-2xl sm:text-3xl font-bold text-[#0369A1] mt-1 font-mono">{activeSessions.length}</div>
-          <span className="text-[11px] text-[#0369A1] font-medium">Sesi sedang aktif</span>
-        </div>
-      </div>
-
-      {/* Main Grid: Verifikasi Antrean + Distribusi Gedung */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Antrean Verifikasi Foto Presensi (Col span 2) */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-[#E2E8F0] shadow-xs flex flex-col justify-between overflow-hidden">
-          <div className="p-6 border-b border-[#E2E8F0] flex items-center justify-between">
+      {/* ── Main Content Grid: Activity List + Quick Management ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left / Main Column: Kegiatan Terbaru (Col span 8) */}
+        <div className="lg:col-span-8 flex flex-col gap-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#e2e8f0]">
             <div>
-              <div className="flex items-center gap-2">
-                <h2
-                  className="text-base font-bold text-[#131B2E]"
-                  data-ui-style="ui-style-vinz70"
-                >
-                  Verifikasi Cepat Bukti Foto Presensi
-                </h2>
-                <span className="px-2 py-0.5 bg-[#FE932C]/20 text-[#904D00] text-[10px] font-bold rounded-full">
-                  FR-04
-                </span>
-              </div>
-              <p className="text-xs text-[#6F7A6E]">
-                Tinjau foto selfie kehadiran mahasiswa dan berikan persetujuan manual.
+              <h2 className="ui-section-title">
+                Kegiatan Terbaru
+              </h2>
+              <p className="ui-meta mt-0.5">
+                Sesi dan kegiatan presensi terbaru di {gedung?.nama_gedung || "gedung binaan"}.
               </p>
             </div>
             <Link
-              href="/fasilitator/verifikasi"
-              className="text-xs font-semibold text-[#0046A4] hover:underline"
+              href="/fasilitator/jadwal"
+              className="text-xs sm:text-sm font-semibold text-[#00652c] hover:underline whitespace-nowrap"
             >
-              Lihat Semua Antrean →
+              Lihat Semua →
             </Link>
           </div>
 
-          {/* Verification Cards List */}
-          <div className="p-6 flex flex-col gap-4">
-            {(activeError || recapError) && <div role="alert" className="rounded-xl border border-[#FECDD3] bg-[#FFF1F2] px-4 py-3 text-sm text-[#BE123C]">Data dashboard tidak dapat dimuat: {activeError ?? recapError}</div>}
-            {queue.length === 0 && <div className="rounded-xl border border-dashed border-[#C9D2C5] px-4 py-8 text-center text-sm text-[#6F7A6E]">Belum ada antrean verifikasi foto yang tersedia dari server.</div>}
-            {queue.map((item) => (
-              <div
-                key={item.id}
-                className="p-4 rounded-xl border border-[#E2E8F0] bg-[#FAF8FF] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-              >
-                {/* Photo Thumbnail simulation + Resident details */}
-                <div className="flex items-center gap-3.5 min-w-0">
-                  <div className="w-14 h-14 rounded-lg bg-[#161D15] flex items-center justify-center flex-shrink-0 text-white font-mono text-xs border border-[#5EDA39]/40 relative overflow-hidden">
-                    <span className="text-lg">🤳</span>
-                  </div>
+          {/* Kegiatan List: nama kegiatan, jadwal, status */}
+          {kegiatanList.length === 0 ? (
+            <div className="py-12 text-center text-sm text-[#6f7a6e] bg-white rounded-lg border border-[#e2e8f0]">
+              Belum ada kegiatan terbaru di {gedung?.nama_gedung || "gedung ini"}.
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg border border-[#e2e8f0] divide-y divide-[#e2e8f0]">
+              {kegiatanList.map((item) => {
+                const formattedDate = item.tanggal
+                  ? new Date(item.tanggal).toLocaleDateString("id-ID", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })
+                  : "";
+                const fmtTime = (iso: string | null) =>
+                  iso
+                    ? new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
+                    : "-";
+                const isClosed = item.status.toLowerCase() === "ditutup";
+                const badgeLabel = item.is_aktif ? "BERLANGSUNG" : isClosed ? "SELESAI" : item.status.toUpperCase();
 
-                  <div className="flex flex-col min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-xs text-[#131B2E]">
-                        {item.nama}
-                      </span>
-                      <span className="text-[11px] font-mono text-[#6F7A6E]">
-                        ({item.nim})
+                return (
+                  <div
+                    key={item.id}
+                    className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-[#f8fafc] transition-colors"
+                  >
+                    <div className="flex flex-col gap-1 min-w-0">
+                      <div className="flex items-baseline gap-2 flex-wrap">
+                        <span className="text-base font-semibold text-[#131b2e]">
+                          {item.nama_sesi}
+                        </span>
+                        <span className="text-xs text-[#6f7a6e] capitalize">
+                          {item.tipe_sesi}
+                        </span>
+                      </div>
+
+                      <div className="text-xs sm:text-sm text-[#3f493f]">
+                        <span>{formattedDate}</span>
+                        <span className="text-[#94a3b8] mx-1.5">·</span>
+                        <span>
+                          {fmtTime(item.waktu_mulai)}
+                          {item.waktu_selesai ? ` - ${fmtTime(item.waktu_selesai)}` : ""} WIB
+                        </span>
+                      </div>
+
+                      {item.keterangan && (
+                        <div className="text-xs text-[#6f7a6e] truncate">{item.keterangan}</div>
+                      )}
+                    </div>
+
+                    <div className="self-start sm:self-center">
+                      <span
+                        className={`inline-block px-3 py-1 text-xs font-semibold rounded-md border ${
+                          item.is_aktif
+                            ? "bg-[#ecfdf5] text-[#15803d] border-[#a7f3d0]"
+                            : "bg-[#f1f5f9] text-[#475569] border-[#cbd5e1]"
+                        }`}
+                      >
+                        {badgeLabel}
                       </span>
                     </div>
-                    <span className="text-[11px] text-[#6F7A6E]">
-                      {item.gedung} • Kamar {item.kamar} • <span className="font-semibold text-[#00652C]">{item.tipe}</span> ({item.waktu})
-                    </span>
-                    <span className="text-[11px] text-[#3F493F] italic mt-0.5 line-clamp-1">
-                      &ldquo;{item.keterangan}&rdquo;
-                    </span>
                   </div>
-                </div>
-
-                {/* Status or Action Buttons */}
-                <div className="flex items-center gap-2 self-end sm:self-center flex-shrink-0">
-                  {item.status === "Menunggu" ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => handleReject(item.id)}
-                        className="px-3 py-1.5 bg-[#FFF1F2] hover:bg-[#FFE4E6] text-[#BE123C] border border-[#FECDD3] rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-                      >
-                        ✕ Tolak
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleApprove(item.id)}
-                        className="px-3.5 py-1.5 bg-[#00652C] hover:bg-[#15803D] text-white rounded-lg text-xs font-semibold transition-colors shadow-xs cursor-pointer"
-                      >
-                        ✓ Setujui
-                      </button>
-                    </>
-                  ) : item.status === "Disetujui" ? (
-                    <span className="px-3 py-1 bg-[#ECFDF5] text-[#15803D] text-xs font-semibold rounded-full border border-[#A7F3D0]">
-                      ✓ Disetujui
-                    </span>
-                  ) : (
-                    <span className="px-3 py-1 bg-[#FFF1F2] text-[#BE123C] text-xs font-semibold rounded-full border border-[#FECDD3]">
-                      ✕ Ditolak
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        {/* Distribusi Kehadiran per Gedung & Jadwal Terdekat (Col span 1) */}
-        <div className="flex flex-col gap-6">
-          {/* Progress per Gedung */}
-          <div className="bg-white rounded-2xl p-6 border border-[#E2E8F0] shadow-xs">
-            <h2
-              className="text-base font-bold text-[#131B2E] mb-1"
-              data-ui-style="ui-style-vinz70"
-            >
-              Kehadiran per Gedung
-            </h2>
-            <p className="text-xs text-[#6F7A6E] mb-4">
-              Persentase mahasiswa yang telah berada di asrama:
+        {/* Right Column: Room Distribution & Fast Links (Col span 4) */}
+        <div className="lg:col-span-4 flex flex-col gap-6">
+          {/* Room Distribution Structure */}
+          <div className="bg-white rounded-lg border border-[#e2e8f0] p-5">
+            <h3 className="text-base font-semibold text-[#131b2e]">
+              Struktur Kamar: {gedung?.nama_gedung || "Gedung"}
+            </h3>
+            <p className="ui-meta mt-1 mb-4">
+              Distribusi kamar dan penghuni binaan Anda.
             </p>
 
-            <div className="flex flex-col gap-3.5">
-              <div>
-                <div className="flex justify-between text-xs font-semibold mb-1">
-                  <span>Gedung Asrama A (Putra)</span>
-                  <span className="text-[#00652C]">96% (96/100)</span>
+            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+              {gedung?.daftar_kamar && gedung.daftar_kamar.length > 0 ? (
+                gedung.daftar_kamar.map((k) => (
+                  <div
+                    key={k.id}
+                    className="flex justify-between items-center text-xs sm:text-sm p-2.5 bg-[#f8fafc] border border-[#f1f5f9] rounded-md"
+                  >
+                    <span className="font-medium text-[#131b2e]">
+                      Kamar {k.nomor_kamar} (Lantai {k.lantai})
+                    </span>
+                    <span className="font-semibold text-[#00652c]">
+                      {k.total_penghuni} Mahasiswa
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-xs text-[#6f7a6e] py-4 text-center">
+                  Data kamar belum tersedia.
                 </div>
-                <div className="w-full h-2 bg-[#EAEDFF] rounded-full overflow-hidden">
-                  <div className="h-full bg-[#00652C] rounded-full" data-ui-style="ui-style-1ralbvs" />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs font-semibold mb-1">
-                  <span>Gedung Asrama B (Putra)</span>
-                  <span className="text-[#00652C]">92% (88/96)</span>
-                </div>
-                <div className="w-full h-2 bg-[#EAEDFF] rounded-full overflow-hidden">
-                  <div className="h-full bg-[#00652C] rounded-full" data-ui-style="ui-style-1ral8q4" />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs font-semibold mb-1">
-                  <span>Gedung Asrama C (Putri)</span>
-                  <span className="text-[#00652C]">90% (72/80)</span>
-                </div>
-                <div className="w-full h-2 bg-[#EAEDFF] rounded-full overflow-hidden">
-                  <div className="h-full bg-[#00652C] rounded-full" data-ui-style="ui-style-1ral71q" />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs font-semibold mb-1">
-                  <span>Gedung Asrama D (Putri)</span>
-                  <span className="text-[#00652C]">94% (62/66)</span>
-                </div>
-                <div className="w-full h-2 bg-[#EAEDFF] rounded-full overflow-hidden">
-                  <div className="h-full bg-[#00652C] rounded-full" data-ui-style="ui-style-1rala7e" />
-                </div>
-              </div>
+              )}
             </div>
           </div>
 
-          {/* Quick Action Box */}
-          <div className="bg-white rounded-2xl p-6 border border-[#E2E8F0] shadow-xs flex flex-col gap-3">
-            <h3 className="text-xs font-bold text-[#131B2E] uppercase tracking-wider">
-              Aksi Cepat Fasilitator
+          {/* Quick Actions (Clean text-first, NO redundant icons) */}
+          <div className="bg-white rounded-lg border border-[#e2e8f0] p-5">
+            <h3 className="text-base font-semibold text-[#131b2e] mb-1">
+              Navigasi Cepat
             </h3>
-            <Link
-              href="/fasilitator/jadwal"
-              className="w-full py-2.5 px-4 bg-[#F0F4FF] hover:bg-[#DAE2FD] text-[#0046A4] text-xs font-semibold rounded-xl flex items-center justify-between transition-colors"
-            >
-              <span>+ Buat Jadwal Kegiatan Asrama</span>
-              <span>→</span>
-            </Link>
-            <Link
-              href="/fasilitator/rekap"
-              className="w-full py-2.5 px-4 bg-[#ECFDF5] hover:bg-[#D3FFD5] text-[#00652C] text-xs font-semibold rounded-xl flex items-center justify-between transition-colors"
-            >
-              <span>📊 Unduh Rekap Laporan Kehadiran</span>
-              <span>→</span>
-            </Link>
-            <Link
-              href="/fasilitator/mahasiswa"
-              className="w-full py-2.5 px-4 bg-[#FAF8FF] hover:bg-[#EAEDFF] text-[#131B2E] text-xs font-semibold rounded-xl flex items-center justify-between transition-colors"
-            >
-              <span>👥 Kelola Data Mahasiswa</span>
-              <span>→</span>
-            </Link>
+            <p className="ui-meta mb-4">
+              Akses modul operasional fasilitator.
+            </p>
+
+            <div className="flex flex-col gap-2">
+              <Link
+                href="/fasilitator/mahasiswa"
+                className="p-3 bg-[#f8fafc] hover:bg-[#f1f5f9] text-[#131b2e] text-xs sm:text-sm font-semibold rounded-md border border-[#e2e8f0] flex items-center justify-between transition-colors"
+              >
+                <span>Kelola Data Mahasiswa</span>
+                <span className="text-[#6f7a6e]">→</span>
+              </Link>
+              <Link
+                href="/fasilitator/rekap"
+                className="p-3 bg-[#f8fafc] hover:bg-[#f1f5f9] text-[#131b2e] text-xs sm:text-sm font-semibold rounded-md border border-[#e2e8f0] flex items-center justify-between transition-colors"
+              >
+                <span>Rekap & Ekspor Laporan</span>
+                <span className="text-[#6f7a6e]">→</span>
+              </Link>
+              <Link
+                href="/fasilitator/area-absensi"
+                className="p-3 bg-[#f8fafc] hover:bg-[#f1f5f9] text-[#131b2e] text-xs sm:text-sm font-semibold rounded-md border border-[#e2e8f0] flex items-center justify-between transition-colors"
+              >
+                <span>Pengaturan Area Presensi (Polygon)</span>
+                <span className="text-[#6f7a6e]">→</span>
+              </Link>
+            </div>
           </div>
         </div>
       </div>

@@ -3,7 +3,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import LogoutConfirmModal from "@/components/feedback/LogoutConfirmModal";
 
 interface MenuItem {
   name: string;
@@ -30,6 +31,21 @@ export default function Sidebar({ onCloseMobile }: SidebarProps) {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [storedUser, setStoredUser] = useState<StoredUser | null>(null);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close profile menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setShowProfileMenu(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   useEffect(() => {
     const rawUser = localStorage.getItem("user");
@@ -140,6 +156,17 @@ export default function Sidebar({ onCloseMobile }: SidebarProps) {
       ),
     },
     {
+      name: "Area Absensi",
+      href: "/fasilitator/area-absensi",
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
+          <line x1="8" y1="2" x2="8" y2="18" />
+          <line x1="16" y1="6" x2="16" y2="22" />
+        </svg>
+      ),
+    },
+    {
       name: "Manajemen Pengguna",
       href: "/fasilitator/pengguna",
       icon: (
@@ -154,7 +181,10 @@ export default function Sidebar({ onCloseMobile }: SidebarProps) {
   ];
 
   const currentMenus = role === "fasilitator"
-    ? fasilitatorMenus.filter((item) => item.href !== "/fasilitator/pengguna" || storedUser?.role === "admin")
+    ? fasilitatorMenus.filter((item) => {
+        if (item.href === "/fasilitator/pengguna") return storedUser?.role === "admin";
+        return true;
+      })
     : mahasiswaMenus;
 
   const handleLogout = () => {
@@ -242,87 +272,113 @@ export default function Sidebar({ onCloseMobile }: SidebarProps) {
       </div>
 
       {/* Bottom Section: Account card and profile menu */}
-      <div className="relative pt-6" data-ui-style="ui-style-jqmtqh">
+      <div className="relative pt-6" ref={profileMenuRef} data-ui-style="ui-style-jqmtqh">
         <button
           type="button"
           onClick={() => setShowProfileMenu((isOpen) => !isOpen)}
           aria-expanded={showProfileMenu}
           aria-haspopup="menu"
           aria-label="Buka menu akun"
-          className="flex min-h-11 w-full items-center gap-3 rounded-lg text-left transition-colors hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#76B900]"
-          data-ui-style="ui-style-3u9dyp"
+          className={`group flex min-h-11 w-full items-center gap-3 rounded-xl p-3 text-left transition-all duration-200 border ${
+            showProfileMenu
+              ? "bg-white/15 border-white/25 shadow-lg"
+              : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20"
+          } focus:outline-none focus-visible:ring-2 focus-visible:ring-[#76B900]`}
         >
-          <div className={`sidebar-avatar ${role === "fasilitator" ? "sidebar-avatar--fasilitator" : ""}`}>
-            {initials || (role === "fasilitator" ? "FS" : "MHS")}
+          <div className="relative">
+            <div className={`sidebar-avatar ${role === "fasilitator" ? "sidebar-avatar--fasilitator" : ""} transition-transform group-hover:scale-105`}>
+              {initials || (role === "fasilitator" ? "FS" : "MHS")}
+            </div>
+            <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-[#0B2115]" />
           </div>
           <span className="min-w-0 flex-1">
-            <span className="block truncate" data-ui-style="ui-style-1msccub">
+            <span className="block truncate font-sans text-xs font-semibold text-white tracking-tight">
               {displayName}
             </span>
-            <span className="block truncate" data-ui-style="ui-style-3p5hkc">
+            <span className="block truncate font-sans text-[11px] text-[#A0ABA0] mt-0.5">
               {displayIdentifier}
             </span>
           </span>
-          <svg className={`h-4 w-4 flex-shrink-0 text-[#DDE5D6] transition-transform ${showProfileMenu ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
+          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-white/5 text-[#DDE5D6] transition-transform duration-200 group-hover:bg-white/10">
+            <svg
+              className={`h-4 w-4 transition-transform duration-200 ${showProfileMenu ? "rotate-180" : ""}`}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </div>
         </button>
 
         {showProfileMenu && (
-          <div className="absolute bottom-[76px] left-0 right-0 z-40 overflow-hidden rounded-xl border border-white/10 bg-[#102016] py-1.5 shadow-xl" role="menu">
+          <div
+            className="absolute bottom-[80px] left-0 right-0 z-40 overflow-hidden rounded-2xl border border-white/15 bg-[#0B2115]/95 p-1.5 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-150"
+            role="menu"
+          >
+            {/* Popover Mini Profile Header */}
+            <div className="flex items-center justify-between border-b border-white/10 px-3 py-2.5 mb-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-[#A0ABA0]">
+                Akun SIMAS
+              </span>
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold border ${
+                role === "fasilitator"
+                  ? "bg-blue-500/20 text-blue-300 border-blue-400/30"
+                  : "bg-emerald-500/20 text-emerald-300 border-emerald-400/30"
+              }`}>
+                {role === "fasilitator" ? "Fasilitator" : "Mahasiswa"}
+              </span>
+            </div>
+
             <Link
               href={role === "fasilitator" ? "/fasilitator/dashboard" : "/mahasiswa/dashboard"}
               onClick={() => setShowProfileMenu(false)}
-              className="flex min-h-11 items-center gap-2 px-4 py-2.5 text-xs font-medium text-[#E6E9E7] transition-colors hover:bg-white/10"
+              className="flex min-h-10 items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[#E6E9E7] transition-all hover:bg-white/10 hover:text-white"
               role="menuitem"
             >
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-              </svg>
-              Dashboard Saya
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-white">
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                </svg>
+              </div>
+              <span className="flex-1">Dashboard Saya</span>
             </Link>
+
+            <div className="my-1 border-t border-white/10" />
+
             <button
               type="button"
-              onClick={() => { setShowProfileMenu(false); setShowLogoutDialog(true); }}
-              className="flex min-h-11 w-full items-center gap-2 border-t border-white/10 px-4 py-2.5 text-left text-xs font-medium text-[#FFB4AB] transition-colors hover:bg-white/10"
+              onClick={() => {
+                setShowProfileMenu(false);
+                setShowLogoutDialog(true);
+              }}
+              className="flex min-h-10 w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-rose-300 transition-all hover:bg-rose-500/15 hover:text-rose-200"
               role="menuitem"
             >
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
-              Keluar Sesi
-            </button>
-          </div>
-        )}
-      </div>
-
-      {showLogoutDialog && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0B1710]/65 p-4" role="dialog" aria-modal="true" aria-labelledby="logout-title" aria-describedby="logout-description">
-          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-[#DDE5D6] bg-white shadow-2xl">
-            <div className="flex items-start gap-4 border-b border-[#E8ECE6] px-6 py-5">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#FFF1F2] text-[#BA1A1A]" aria-hidden="true">
-                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-500/20 text-rose-300">
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                   <polyline points="16 17 21 12 16 7" />
                   <line x1="21" y1="12" x2="9" y2="12" />
                 </svg>
               </div>
-              <div className="min-w-0">
-                <h2 id="logout-title" className="text-lg font-bold text-[#191C1B]">Keluar dari sesi?</h2>
-                <p id="logout-description" className="mt-1 text-sm leading-5 text-[#596155]">
-                  Sesi Anda akan diakhiri. Anda perlu login kembali untuk mengakses portal SIMAS UNAND.
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-col-reverse gap-3 bg-[#FAFCF9] px-6 py-4 sm:flex-row sm:justify-end">
-              <button type="button" onClick={() => setShowLogoutDialog(false)} className="min-h-11 rounded-lg border border-[#C9D2C5] px-4 py-2 text-sm font-semibold text-[#3E4A38] transition-colors hover:bg-[#F2F4F2] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#76B900]">Tetap di sini</button>
-              <button type="button" onClick={handleLogout} className="min-h-11 rounded-lg bg-[#BA1A1A] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#93000A] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#BA1A1A] focus-visible:ring-offset-2">Keluar sesi</button>
-            </div>
+              <span className="flex-1">Keluar Sesi</span>
+            </button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
+
+      {/* Modern Confirmation Dialog Modal */}
+      <LogoutConfirmModal
+        isOpen={showLogoutDialog}
+        onClose={() => setShowLogoutDialog(false)}
+        onConfirm={handleLogout}
+        user={storedUser}
+        role={role}
+      />
     </aside>
   );
 }

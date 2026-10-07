@@ -49,14 +49,14 @@ export default function Navbar({ onToggleMobileMenu }: NavbarProps) {
   }, []);
 
   return (
-    <header className="h-16 bg-white border-b border-[#E2E8F0] px-4 sm:px-6 flex items-center justify-between sticky top-0 z-20">
+    <header className="h-16 bg-white border-b border-[#E2E8F0] px-4 sm:px-6 lg:px-8 flex items-center justify-between sticky top-0 z-20">
       {/* Left: Mobile Toggle & Page Context */}
       <div className="flex items-center gap-3">
         {/* Mobile menu button */}
         <button
           type="button"
           onClick={onToggleMobileMenu}
-          className="lg:hidden p-2 rounded-lg text-[#3F493F] hover:bg-[#F8FAFC] transition-colors"
+          className="lg:hidden p-2 rounded-lg text-[#3F493F] hover:bg-[#F8FAFC] transition-colors cursor-pointer"
           aria-label="Buka Menu"
         >
           <svg
@@ -74,34 +74,31 @@ export default function Navbar({ onToggleMobileMenu }: NavbarProps) {
           </svg>
         </button>
 
-        <div className="flex items-center gap-2 text-xs text-[#6F7A6E]">
-          {!pathname.includes("/mahasiswa/presensi") && <>
-            <span className="hidden sm:inline">{isFasilitator ? "Portal Fasilitator" : "Portal Mahasiswa"}</span>
-            <span className="hidden sm:inline">/</span>
-          </>}
-          <span className="navbar-page-title">{pageTitle}</span>
+        <div className="flex items-center gap-2.5">
+          <span className="text-base sm:text-lg font-bold text-[#131B2E] tracking-tight">
+            {pageTitle}
+          </span>
         </div>
       </div>
 
-      {/* Right: Realtime Clock */}
+      {/* Right: Realtime Clock with Functional Icon */}
       <div className="flex items-center">
-        {/* Realtime Digital Clock */}
-        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-[#FAF8FF] border border-[#EAEDFF] rounded-lg">
+        <div className="flex items-center gap-2 text-xs sm:text-sm font-mono font-medium text-[#3F493F]">
           <svg
-            className={`w-4 h-4 ${isFasilitator ? "text-[#0046A4]" : "text-[#00652C]"}`}
+            className="w-4 h-4 text-[#00652C] shrink-0"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
+            aria-hidden="true"
           >
             <circle cx="12" cy="12" r="10" />
             <polyline points="12 6 12 12 16 14" />
           </svg>
-          <span className="navbar-clock">{currentDateTime || "Memuat waktu..."}</span>
+          <span className="tracking-tight">{currentDateTime || "Memuat waktu..."}</span>
         </div>
-
       </div>
     </header>
   );

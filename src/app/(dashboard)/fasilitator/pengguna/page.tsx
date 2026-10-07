@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Link from "next/link";
 import { useMutation } from "@/hooks/useApi";
 import type { ApiResponse } from "@/types/attendance";
 
@@ -37,15 +36,57 @@ export default function FasilitatorPenggunaPage() {
 
   return (
     <div className="flex flex-col gap-6 pb-12 w-full">
-      <div><div className="flex items-center gap-2 text-xs text-[#6F7A6E] mb-1"><Link href="/fasilitator/dashboard">Dashboard Fasilitator</Link><span>/</span><span className="font-semibold text-[#131B2E]">Manajemen Pengguna</span></div><h1 className="page-title">Impor Pengguna Massal</h1><p className="text-xs text-[#6F7A6E]">Tambahkan mahasiswa atau pengguna fasilitator melalui CSV atau Excel.</p></div>
-      <form onSubmit={submit} className="max-w-xl bg-white rounded-2xl border border-[#E2E8F0] p-6 flex flex-col gap-4">
-        <label htmlFor="user-import" className="text-sm font-semibold text-[#131B2E]">File pengguna</label>
-        <input ref={inputRef} id="user-import" type="file" accept=".csv,.xlsx" onChange={(event) => setFile(event.target.files?.[0] ?? null)} className="min-h-11 text-sm" />
-        <p className="text-xs text-[#6F7A6E]">Kolom wajib: `nim`, `nama`, `password`. Kolom opsional: `role`, `email`, `asal`, `jekel`, `kamar_id`.</p>
-        {message && <div role="status" className="rounded-xl border border-[#A7F3D0] bg-[#ECFDF5] px-4 py-3 text-sm text-[#15803D]">{message}</div>}
-        {error && <div role="alert" className="rounded-xl border border-[#FECDD3] bg-[#FFF1F2] px-4 py-3 text-sm text-[#BE123C]">Impor gagal: {error}</div>}
-        <button type="submit" disabled={loading || !file} className="min-h-11 rounded-xl bg-[#00652C] text-white text-sm font-bold disabled:opacity-50">{loading ? "Memproses..." : "Impor Pengguna"}</button>
-      </form>
+      <div>
+        <h1 className="ui-page-title">Impor Pengguna Massal</h1>
+        <p className="ui-meta mt-1">Tambahkan mahasiswa atau pengguna fasilitator melalui file data CSV atau Excel.</p>
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-200/80 p-6 md:p-8 max-w-2xl shadow-xs">
+        <form onSubmit={submit} className="flex flex-col gap-5">
+          <div>
+            <label htmlFor="user-import" className="block text-sm font-semibold text-slate-800 mb-2">
+              File Data Pengguna (.csv, .xlsx)
+            </label>
+            <input
+              ref={inputRef}
+              id="user-import"
+              type="file"
+              accept=".csv,.xlsx"
+              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              className="w-full text-sm p-3 border border-slate-200 rounded-lg bg-slate-50/50 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300 cursor-pointer"
+            />
+          </div>
+
+          <div className="p-3.5 bg-slate-50 rounded-lg border border-slate-200/70 text-xs text-slate-600 leading-relaxed">
+            <span className="font-semibold text-slate-800">Format kolom:</span>
+            <ul className="list-disc pl-5 mt-1 space-y-0.5">
+              <li><span className="font-medium text-slate-800">Kolom wajib:</span> <code className="bg-slate-200/60 px-1 py-0.5 rounded text-slate-700 font-mono">nim</code>, <code className="bg-slate-200/60 px-1 py-0.5 rounded text-slate-700 font-mono">nama</code>, <code className="bg-slate-200/60 px-1 py-0.5 rounded text-slate-700 font-mono">password</code></li>
+              <li><span className="font-medium text-slate-800">Kolom opsional:</span> <code className="bg-slate-200/60 px-1 py-0.5 rounded text-slate-700 font-mono">role</code>, <code className="bg-slate-200/60 px-1 py-0.5 rounded text-slate-700 font-mono">email</code>, <code className="bg-slate-200/60 px-1 py-0.5 rounded text-slate-700 font-mono">asal</code>, <code className="bg-slate-200/60 px-1 py-0.5 rounded text-slate-700 font-mono">jekel</code>, <code className="bg-slate-200/60 px-1 py-0.5 rounded text-slate-700 font-mono">kamar_id</code></li>
+            </ul>
+          </div>
+
+          {message && (
+            <div role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              {message}
+            </div>
+          )}
+          {error && (
+            <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              Impor gagal: {error}
+            </div>
+          )}
+
+          <div className="pt-2">
+            <button
+              type="submit"
+              disabled={loading || !file}
+              className="ui-btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? "Memproses Impor..." : "Mulai Impor Pengguna"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

@@ -7,7 +7,7 @@
  * - Melempar Error dengan message dari response JSON (field `message`)
  */
 
-const API_BASE_URL =
+export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   (typeof window !== "undefined" && window.location.port === "3000"
     ? "http://127.0.0.1:5000"
@@ -71,8 +71,11 @@ async function apiClient<T = unknown>(
     body,
   });
 
-  // 401 → session habis / token tidak valid, paksa login ulang
-  if (response.status === 401) {
+  // 401 → session habis / token tidak valid, paksa login ulang.
+  // Dikecualikan untuk endpoint login (401 di sana = kredensial salah) dan
+  // request tanpa token (belum pernah login, jadi bukan "sesi berakhir").
+  const isLoginRequest = endpoint.startsWith("/api/auth/login");
+  if (response.status === 401 && !isLoginRequest && token) {
     handleUnauthorized();
     throw new Error("Sesi telah berakhir. Silakan login kembali.");
   }
