@@ -5,27 +5,23 @@ import Image from "next/image";
 const FEATURES = [
   {
     icon: (
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-        <rect x="2" y="2" width="7" height="7" rx="1.5" stroke="var(--auth-hero-accent)" strokeWidth="1.6"/>
-        <rect x="11" y="2" width="7" height="7" rx="1.5" stroke="var(--auth-hero-accent)" strokeWidth="1.6"/>
-        <rect x="2" y="11" width="7" height="7" rx="1.5" stroke="var(--auth-hero-accent)" strokeWidth="1.6"/>
-        <path d="M14.5 11v6M11 14.5h7" stroke="var(--auth-hero-accent)" strokeWidth="1.6" strokeLinecap="round"/>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <path d="M12 2C8.134 2 5 5.134 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.866-3.134-7-7-7z" stroke="var(--auth-hero-accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+        <circle cx="12" cy="9" r="2.5" stroke="var(--auth-hero-accent)" strokeWidth="1.8"/>
       </svg>
     ),
-    label: "Absensi Berbasis Foto",
-    desc: "Mahasiswa unggah foto sebagai bukti kehadiran. Admin verifikasi secara manual.",
+    label: "Geofencing & Foto Selfie",
+    desc: "Validasi presensi akurat melalui foto selfie dan radius koordinat polygon gedung asrama.",
   },
   {
     icon: (
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-        <rect x="2" y="3" width="16" height="14" rx="2" stroke="var(--auth-hero-accent)" strokeWidth="1.6"/>
-        <path d="M2 8h16" stroke="var(--auth-hero-accent)" strokeWidth="1.6" strokeLinecap="round"/>
-        <path d="M6 1v4M14 1v4" stroke="var(--auth-hero-accent)" strokeWidth="1.6" strokeLinecap="round"/>
-        <path d="M5.5 12h4M5.5 14.5h7" stroke="var(--auth-hero-accent)" strokeWidth="1.6" strokeLinecap="round"/>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="9" stroke="var(--auth-hero-accent)" strokeWidth="1.8"/>
+        <path d="M12 7v5l3.5 2" stroke="var(--auth-hero-accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
       </svg>
     ),
-    label: "Rekap & Laporan",
-    desc: "Dashboard rekap kehadiran harian, mingguan, dan bulanan siap ekspor.",
+    label: "Sesi Subuh & Malam",
+    desc: "Presensi terstruktur per sesi waktu server, pengajuan izin, dan verifikasi oleh fasilitator gedung.",
   },
 ];
 
@@ -62,11 +58,12 @@ export default function HeroPanel() {
             data-ui-style="ui-style-138ub0n"
           >
             <Image
-              src="/images/logo-simas.svg"
-              alt="Logo SIMAS Asrama Unand"
+              src="/images/logo-unand.svg"
+              alt="Logo Universitas Andalas"
               width={52}
               height={52}
               priority
+              className="object-contain"
               data-ui-style="ui-style-pp70z2"
             />
           </div>
@@ -74,7 +71,7 @@ export default function HeroPanel() {
             <span
               data-ui-style="ui-style-114jylo"
             >
-              UPT Asrama Unand
+              Asrama Unand
             </span>
             <span
               data-ui-style="ui-style-19sa35t"
@@ -95,7 +92,7 @@ export default function HeroPanel() {
         <p
           data-ui-style="ui-style-1o7enrw"
         >
-          Presensi digital berbasis bukti foto  untuk seluruh warga asrama Universitas Andalas.
+          Presensi digital berbasis verifikasi foto selfie dan validasi Geofencing batas polygon gedung asrama Universitas Andalas.
         </p>
 
         {/* 2-column feature grid */}

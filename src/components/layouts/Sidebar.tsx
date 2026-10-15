@@ -211,12 +211,12 @@ export default function Sidebar({ onCloseMobile }: SidebarProps) {
           data-ui-style="ui-style-1r94u99"
         >
           <Image
-            src="/images/logo-simas.svg"
-            alt="Logo SIMAS UNAND"
+            src="/images/logo-unand.svg"
+            alt="Logo UNAND"
             width={40}
-            height={40}
+            height={43}
             priority
-            className="flex-shrink-0"
+            className="flex-shrink-0 object-contain"
           />
 
           <div className="flex flex-col">

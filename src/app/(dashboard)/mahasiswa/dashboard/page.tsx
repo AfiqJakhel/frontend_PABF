@@ -4,18 +4,63 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useApi } from "@/hooks/useApi";
 import type { ApiResponse, AttendanceHistoryData, AttendanceRecord } from "@/types/attendance";
+import {
+  MONTH_NAMES,
+  calculateMonthStats,
+  getDaySessionEvaluation,
+  type SingleSessionStatus,
+} from "@/utils/attendanceCalendarHelper";
+
+interface KegiatanItem {
+  id: number;
+  nama_kegiatan: string;
+  tanggal: string | null;
+  waktu_mulai: string | null;
+  waktu_selesai: string | null;
+  jam_formatted: string;
+  jam_mulai: string;
+  jam_selesai: string | null;
+  lokasi: string;
+  keterangan: string;
+  nama_fasilitator: string;
+  status: "aktif" | "akan_datang" | "selesai" | "sudah_absen";
+  status_label: string;
+  is_aktif: boolean;
+  sudah_absen: boolean;
+  can_absen: boolean;
+}
+
+interface KegiatanResponseData {
+  gedung_nama: string | null;
+  total: number;
+  items: KegiatanItem[];
+}
 
 export default function MahasiswaDashboardPage() {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [mounted, setMounted] = useState<boolean>(false);
+
   const { data: todayResponse } = useApi<ApiResponse<AttendanceRecord[]>>("/api/mahasiswa/presensi/hari-ini");
   const { data: historyResponse } = useApi<ApiResponse<AttendanceHistoryData>>("/api/mahasiswa/presensi/riwayat?per_page=100");
+  const { data: kegiatanResponse, loading: isLoadingKegiatan } = useApi<ApiResponse<KegiatanResponseData>>(
+    "/api/mahasiswa/presensi/kegiatan"
+  );
+
   const todayRecords = todayResponse?.data ?? [];
   const historyRecords = historyResponse?.data?.items ?? [];
-  const firstTodayRecord = todayRecords[0];
+  const kegiatanList = kegiatanResponse?.data?.items ?? [];
+  const gedungNama = kegiatanResponse?.data?.gedung_nama ?? null;
+
+  const subuhRecord = todayRecords.find((record) => record.sesi === "subuh") || todayRecords[0];
   const nightRecord = todayRecords.find((record) => record.sesi === "malam");
+
+  // Perhitungan jam & batas sesi hari ini
+  const currentTotalMinutes = currentDate.getHours() * 60 + currentDate.getMinutes();
+  const isSubuhExpired = currentTotalMinutes > 6 * 60; // Batas Subuh: 06:00 WIB
+  const isMalamExpired = currentTotalMinutes > 22 * 60; // Batas Malam: 22:00 WIB
+  const isMalamActive = currentTotalMinutes >= 19 * 60 && currentTotalMinutes <= 22 * 60;
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -28,10 +73,7 @@ export default function MahasiswaDashboardPage() {
     return () => window.clearTimeout(timer);
   }, []);
 
-  const monthNames = [
-    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
-  ];
+  const monthNames = MONTH_NAMES;
 
   const handlePrevMonth = () => {
     if (selectedMonth === 0) {
@@ -52,7 +94,6 @@ export default function MahasiswaDashboardPage() {
   };
 
   // Generate calendar days for the selected month
-  // Monday as first day of week: 0 = Sen, 1 = Sel, ..., 6 = Min
   const firstDayOfMonth = new Date(selectedYear, selectedMonth, 1);
   const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
 
@@ -80,48 +121,36 @@ export default function MahasiswaDashboardPage() {
     nextMonthDays.push(n);
   }
 
-  // Attendance status helper based on today
-  const getDateStatus = (day: number) => {
-    const isCurrentMonthView =
-      selectedYear === currentDate.getFullYear() &&
-      selectedMonth === currentDate.getMonth();
+  // Dynamic monthly attendance statistics from centralized helper
+  const monthStats = calculateMonthStats(
+    daysInMonth,
+    selectedMonth,
+    selectedYear,
+    currentDate,
+    historyRecords,
+    todayRecords
+  );
 
-    if (isCurrentMonthView) {
-      const todayDate = currentDate.getDate();
-      if (day === todayDate) return "today";
-      const record = historyRecords.find((item) => item.tanggal === `${selectedYear}-${String(selectedMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`);
-      if (record?.status === "izin" || record?.status === "sakit") return "izin";
-      if (record?.status === "alfa") return "ditolak";
-      if (record) return "hadir";
-      return "future";
+  // Helper styling chip sesi
+  const getSessionBadgeClass = (status: SingleSessionStatus, isActive?: boolean) => {
+    if (isActive) return "mhs-session-badge--aktif";
+    switch (status) {
+      case "hadir":
+        return "mhs-session-badge--hadir";
+      case "izin":
+      case "sakit":
+        return "mhs-session-badge--izin";
+      case "terlambat":
+        return "mhs-session-badge--terlambat";
+      case "alfa":
+        return "mhs-session-badge--alfa";
+      case "belum_absen":
+      case "future":
+      default:
+        return "mhs-session-badge--future";
     }
-
-    // Past month view
-    if (
-      selectedYear < currentDate.getFullYear() ||
-      (selectedYear === currentDate.getFullYear() && selectedMonth < currentDate.getMonth())
-    ) {
-      const record = historyRecords.find((item) => item.tanggal === `${selectedYear}-${String(selectedMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`);
-      if (record?.status === "izin" || record?.status === "sakit") return "izin";
-      if (record?.status === "alfa") return "ditolak";
-      return record ? "hadir" : "future";
-    }
-
-    // Future month view
-    return "future";
   };
 
-  // Formatted date string for top pill: e.g. "Rabu, 30 Sep 2026"
-  const formattedDatePill = mounted
-    ? new Intl.DateTimeFormat("id-ID", {
-        weekday: "long",
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      }).format(currentDate)
-    : "Memuat tanggal...";
-
-  // Formatted date string for section subtitle: e.g. "30 September 2026"
   return (
     <div className="mhs-dashboard">
       {/* ── Section 1: Top Greeting & Header Bar ── */}
@@ -131,7 +160,9 @@ export default function MahasiswaDashboardPage() {
             Selamat Pagi, Muhammad Afiq!
           </h1>
           <div className="mhs-header__location">
-            <span className="mhs-header__location-text">Gedung Asrama A</span>
+            <span className="mhs-header__location-text">
+              {gedungNama ? `Gedung Asrama ${gedungNama}` : "Gedung Asrama A"}
+            </span>
             <span className="mhs-header__dot" />
             <span className="mhs-header__location-text">Kamar 204</span>
           </div>
@@ -145,40 +176,62 @@ export default function MahasiswaDashboardPage() {
         </div>
 
         <div className="mhs-cards-grid">
-          {/* Card 1: Presensi Masuk */}
-          <div className="p-5 bg-white rounded-xl border border-[#e2e8f0] flex flex-col justify-between gap-4">
+          {/* Card 1: Presensi Masuk (Subuh) */}
+          <div className="p-5 sm:p-6 bg-white rounded-2xl border border-[#e2e8f0] flex flex-col justify-between gap-4 shadow-xs">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-[#6f7a6e] block mb-1">
+                <span className="text-xs font-semibold uppercase tracking-wider text-[#64748b] block mb-1">
                   Presensi Masuk (Subuh)
                 </span>
                 <span className="text-xl sm:text-2xl font-bold font-mono text-[#131b2e]">
-                  {firstTodayRecord ? new Intl.DateTimeFormat("id-ID", { timeStyle: "short" }).format(new Date(firstTodayRecord.waktu)) : "Belum Absen"}
+                  {subuhRecord ? new Intl.DateTimeFormat("id-ID", { timeStyle: "short" }).format(new Date(subuhRecord.waktu)) : "Belum Absen"}
                 </span>
               </div>
 
-              <span
-                className={`text-xs font-semibold px-2.5 py-1 rounded-md border ${
-                  firstTodayRecord
-                    ? "bg-[#ecfdf5] text-[#15803d] border-[#a7f3d0]"
-                    : "bg-[#f1f5f9] text-[#64748b] border-[#cbd5e1]"
-                }`}
-              >
-                {firstTodayRecord ? firstTodayRecord.status.toUpperCase() : "BELUM ABSEN"}
-              </span>
+              {subuhRecord ? (
+                <span
+                  className={`text-xs font-semibold px-2.5 py-1 rounded-lg border ${
+                    subuhRecord.status === "terlambat"
+                      ? "bg-[#fff1f2] text-[#be123c] border-[#fecdd3]"
+                      : subuhRecord.status === "izin" || subuhRecord.status === "sakit"
+                      ? "bg-[#fffbeb] text-[#b45309] border-[#fde68a]"
+                      : "bg-[#ecfdf5] text-[#15803d] border-[#a7f3d0]"
+                  }`}
+                >
+                  {subuhRecord.status.toUpperCase()}
+                </span>
+              ) : isSubuhExpired ? (
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-lg border bg-[#fef2f2] text-[#e52020] border-[#fecaca]">
+                  ALFA (TERLEWAT)
+                </span>
+              ) : (
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-lg border bg-[#f8fafc] text-[#64748b] border-[#e2e8f0]">
+                  BELUM ABSEN
+                </span>
+              )}
             </div>
 
-            <div className="pt-3 border-t border-[#f1f5f9] flex items-center justify-between text-xs text-[#6f7a6e]">
-              <span>Pintu Masuk Gedung A</span>
-              <span>{firstTodayRecord ? "Tervalidasi" : "Menunggu presensi"}</span>
+            <div className="pt-3 border-t border-[#f1f5f9] flex items-center justify-between text-xs text-[#64748b]">
+              <span>Batas: 06:00 WIB</span>
+              {!subuhRecord && (
+                <Link
+                  href="/mahasiswa/presensi"
+                  className={`ui-btn-primary text-xs !py-1.5 !min-h-[34px] rounded-xl ${
+                    isSubuhExpired ? "bg-[#e52020] hover:bg-[#b91c1c] border-none text-white" : ""
+                  }`}
+                >
+                  {isSubuhExpired ? "Absen Terlambat" : "Absen Sekarang"}
+                </Link>
+              )}
+              {subuhRecord && <span className="text-[#15803d] font-medium">Pintu Masuk Gedung A • Tervalidasi</span>}
             </div>
           </div>
 
           {/* Card 2: Presensi Malam */}
-          <div className="p-5 bg-white rounded-xl border border-[#e2e8f0] flex flex-col justify-between gap-4">
+          <div className="p-5 sm:p-6 bg-white rounded-2xl border border-[#e2e8f0] flex flex-col justify-between gap-4 shadow-xs">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-[#6f7a6e] block mb-1">
+                <span className="text-xs font-semibold uppercase tracking-wider text-[#64748b] block mb-1">
                   Presensi Malam
                 </span>
                 <span className="text-xl sm:text-2xl font-bold font-mono text-[#131b2e]">
@@ -186,39 +239,62 @@ export default function MahasiswaDashboardPage() {
                 </span>
               </div>
 
-              <span
-                className={`text-xs font-semibold px-2.5 py-1 rounded-md border ${
-                  nightRecord
-                    ? "bg-[#ecfdf5] text-[#15803d] border-[#a7f3d0]"
-                    : "bg-[#fffbeb] text-[#b45309] border-[#fde68a]"
-                }`}
-              >
-                {nightRecord ? nightRecord.status.toUpperCase() : "BELUM ABSEN"}
-              </span>
+              {nightRecord ? (
+                <span
+                  className={`text-xs font-semibold px-2.5 py-1 rounded-lg border ${
+                    nightRecord.status === "terlambat"
+                      ? "bg-[#fff1f2] text-[#be123c] border-[#fecdd3]"
+                      : nightRecord.status === "izin" || nightRecord.status === "sakit"
+                      ? "bg-[#fffbeb] text-[#b45309] border-[#fde68a]"
+                      : "bg-[#ecfdf5] text-[#15803d] border-[#a7f3d0]"
+                  }`}
+                >
+                  {nightRecord.status.toUpperCase()}
+                </span>
+              ) : isMalamExpired ? (
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-lg border bg-[#fef2f2] text-[#e52020] border-[#fecaca]">
+                  ALFA (TERLEWAT)
+                </span>
+              ) : isMalamActive ? (
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-lg border bg-[#fffbeb] text-[#b45309] border-[#fde68a]">
+                  SEDANG AKTIF
+                </span>
+              ) : (
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-lg border bg-[#f8fafc] text-[#64748b] border-[#e2e8f0]">
+                  BELUM DIBUKA
+                </span>
+              )}
             </div>
 
             <div className="pt-3 border-t border-[#f1f5f9] flex items-center justify-between gap-2">
-              <span className="text-xs text-[#6f7a6e]">Batas: 22:00 WIB</span>
+              <span className="text-xs text-[#64748b]">Batas: 22:00 WIB</span>
               {!nightRecord && (
-                <Link href="/mahasiswa/presensi" className="ui-btn-primary text-xs !py-1.5 !min-h-[32px]">
-                  Absen Sekarang
+                <Link
+                  href="/mahasiswa/presensi"
+                  className={`ui-btn-primary text-xs !py-1.5 !min-h-[34px] rounded-xl ${
+                    isMalamExpired ? "bg-[#e52020] hover:bg-[#b91c1c] border-none text-white" : ""
+                  }`}
+                >
+                  {isMalamExpired ? "Absen Terlambat" : "Absen Sekarang"}
                 </Link>
               )}
+              {nightRecord && <span className="text-xs text-[#15803d] font-medium">Tervalidasi</span>}
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── Section 3: Monthly Attendance Calendar Widget ── */}
-      <div className="bg-white rounded-xl border border-[#e2e8f0] p-5 sm:p-6 flex flex-col gap-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#e2e8f0]">
+      {/* ── Section 3: Monthly Attendance Calendar Widget with Dual Sessions ── */}
+      <div className="mhs-calendar-card">
+        {/* Calendar Header with Navigation and Summary Stats */}
+        <div className="mhs-calendar-header">
           <div className="flex flex-col gap-1">
             <h2 className="ui-section-title">Kalender Kehadiran</h2>
             <div className="flex items-center gap-2 mt-1">
               <button
                 type="button"
                 onClick={handlePrevMonth}
-                className="w-8 h-8 flex items-center justify-center rounded-md border border-[#d0d7de] hover:bg-[#f8fafc] text-sm cursor-pointer"
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#e2e8f0] hover:bg-[#f8fafc] text-sm cursor-pointer"
                 title="Bulan Sebelumnya"
                 aria-label="Bulan sebelumnya"
               >
@@ -227,7 +303,7 @@ export default function MahasiswaDashboardPage() {
               <select
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                className="h-8 px-2 bg-white border border-[#d0d7de] rounded-md text-xs sm:text-sm font-semibold text-[#131b2e] outline-none cursor-pointer"
+                className="h-8 px-2.5 bg-white border border-[#e2e8f0] rounded-lg text-xs sm:text-sm font-semibold text-[#131b2e] outline-none cursor-pointer"
               >
                 {monthNames.map((m, idx) => (
                   <option key={m} value={idx}>
@@ -238,7 +314,7 @@ export default function MahasiswaDashboardPage() {
               <button
                 type="button"
                 onClick={handleNextMonth}
-                className="w-8 h-8 flex items-center justify-center rounded-md border border-[#d0d7de] hover:bg-[#f8fafc] text-sm cursor-pointer"
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#e2e8f0] hover:bg-[#f8fafc] text-sm cursor-pointer"
                 title="Bulan Selanjutnya"
                 aria-label="Bulan selanjutnya"
               >
@@ -247,148 +323,235 @@ export default function MahasiswaDashboardPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 text-xs font-semibold px-3 py-1.5 bg-[#f8fafc] rounded-lg border border-[#e2e8f0]">
-            <span className="text-[#15803d]">Hadir: 24</span>
-            <span className="text-[#94a3b8]">•</span>
-            <span className="text-[#b45309]">Izin: 1</span>
-            <span className="text-[#94a3b8]">•</span>
-            <span className="text-[#be123c]">Alpha: 0</span>
-            <span className="text-[#94a3b8]">•</span>
-            <span className="text-[#131b2e]">96.8%</span>
+          <div className="flex items-center gap-2 sm:gap-3 text-xs font-semibold px-3 py-1.5 bg-[#f8fafc] rounded-xl border border-[#e2e8f0] flex-wrap">
+            <span className="text-[#15803d]">Hadir: {monthStats.hadir}</span>
+            <span className="text-[#cbd5e1]">•</span>
+            <span className="text-[#b45309]">Izin: {monthStats.izin}</span>
+            <span className="text-[#cbd5e1]">•</span>
+            <span className="text-[#be123c]">Terlambat: {monthStats.terlambat}</span>
+            <span className="text-[#cbd5e1]">•</span>
+            <span className="text-[#e52020]">Alfa: {monthStats.alfa}</span>
+            <span className="text-[#cbd5e1]">•</span>
+            <span className="text-[#131b2e] font-bold">{monthStats.percentage}%</span>
           </div>
         </div>
 
         {/* Calendar Grid Table */}
         <div className="mhs-calendar-body">
-          <div className="mhs-calendar-days-header">
+          <div className="mhs-calendar-days-header mb-1.5">
             {["SEN", "SEL", "RAB", "KAM", "JUM", "SAB", "MIN"].map((dayName) => (
-              <div key={dayName} className="mhs-day-name">
+              <div key={dayName} className="text-[11px] font-semibold tracking-wider text-[#64748b] uppercase text-center py-1">
                 {dayName}
               </div>
             ))}
           </div>
 
           <div className="mhs-calendar-grid">
+            {/* Prev month padding cells */}
             {prevMonthDays.map((d) => (
               <div key={`prev-${d}`} className="mhs-date-cell mhs-date-cell--inactive">
-                <span className="mhs-date-num--inactive">{d}</span>
+                <span className="mhs-date-num mhs-date-num--inactive">{d}</span>
+                <div className="mhs-cell-sessions">
+                  <span className="mhs-session-badge mhs-session-badge--future" title="Bulan Sebelumnya">S</span>
+                  <span className="mhs-session-badge mhs-session-badge--future" title="Bulan Sebelumnya">M</span>
+                </div>
               </div>
             ))}
 
+            {/* Current month days with dual session indicators */}
             {currentMonthDays.map((day) => {
-              const status = getDateStatus(day);
+              const dayEval = getDaySessionEvaluation(
+                day,
+                selectedMonth,
+                selectedYear,
+                currentDate,
+                historyRecords,
+                todayRecords
+              );
 
-              if (status === "today") {
-                return (
-                  <div key={`curr-${day}`} className="mhs-date-cell mhs-date-cell--today">
-                    <span className="mhs-date-num--today">{day}</span>
-                    <span className="mhs-dot mhs-dot--green" />
-                  </div>
-                );
-              }
+              const cellClasses = [
+                "mhs-date-cell",
+                dayEval.isToday ? "mhs-date-cell--today" : "",
+                dayEval.isFuture ? "mhs-date-cell--future" : "",
+              ]
+                .filter(Boolean)
+                .join(" ");
 
-              if (status === "izin") {
-                return (
-                  <div key={`curr-${day}`} className="mhs-date-cell mhs-date-cell--izin">
-                    <span className="mhs-date-num--izin">{day}</span>
-                    <span className="mhs-dot mhs-dot--amber" />
-                  </div>
-                );
-              }
+              const subuhBadgeClass = getSessionBadgeClass(dayEval.subuh.status, dayEval.subuh.isActive);
+              const malamBadgeClass = getSessionBadgeClass(dayEval.malam.status, dayEval.malam.isActive);
 
-              if (status === "ditolak") {
-                return (
-                  <div key={`curr-${day}`} className="mhs-date-cell mhs-date-cell--ditolak">
-                    <span className="mhs-date-num--ditolak">{day}</span>
-                    <span className="mhs-dot mhs-dot--red" />
-                  </div>
-                );
-              }
-
-              if (status === "hadir") {
-                return (
-                  <div key={`curr-${day}`} className="mhs-date-cell mhs-date-cell--hadir">
-                    <span className="mhs-date-num--hadir">{day}</span>
-                    <span className="mhs-dot mhs-dot--green" />
-                  </div>
-                );
-              }
+              const tooltipText = `Tanggal ${day} ${monthNames[selectedMonth]} ${selectedYear}
+• Subuh: ${dayEval.subuh.status.toUpperCase()} (${dayEval.subuh.waktuFormatted})
+• Malam: ${dayEval.malam.status.toUpperCase()} (${dayEval.malam.waktuFormatted})`;
 
               return (
-                <div key={`curr-${day}`} className="mhs-date-cell mhs-date-cell--future">
-                  <span className="mhs-date-num--future">{day}</span>
+                <div
+                  key={`curr-${day}`}
+                  className={cellClasses}
+                  title={tooltipText}
+                >
+                  <span className={`mhs-date-num ${dayEval.isToday ? "mhs-date-num--today" : ""}`}>
+                    {day}
+                  </span>
+
+                  <div className="mhs-cell-sessions">
+                    <span
+                      className={`mhs-session-badge ${subuhBadgeClass}`}
+                      title={`Subuh: ${dayEval.subuh.status.toUpperCase()}`}
+                    >
+                      S
+                    </span>
+                    <span
+                      className={`mhs-session-badge ${malamBadgeClass}`}
+                      title={`Malam: ${dayEval.malam.status.toUpperCase()}`}
+                    >
+                      M
+                    </span>
+                  </div>
                 </div>
               );
             })}
 
+            {/* Next month padding cells */}
             {nextMonthDays.map((nd) => (
               <div key={`next-${nd}`} className="mhs-date-cell mhs-date-cell--inactive">
-                <span className="mhs-date-num--inactive">{nd}</span>
+                <span className="mhs-date-num mhs-date-num--inactive">{nd}</span>
+                <div className="mhs-cell-sessions">
+                  <span className="mhs-session-badge mhs-session-badge--future" title="Bulan Berikutnya">S</span>
+                  <span className="mhs-session-badge mhs-session-badge--future" title="Bulan Berikutnya">M</span>
+                </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Calendar Legend at bottom */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-[#f1f5f9] text-xs text-[#6f7a6e]">
-          <div className="flex items-center gap-4 flex-wrap">
+        {/* Calendar Legend */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-[#f1f5f9] text-xs text-[#64748b]">
+          <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#15803d]" />
+              <span className="w-4 h-4 rounded-md bg-[#ecfdf5] border border-[#a7f3d0] text-[#15803d] text-[9px] font-bold flex items-center justify-center">S</span>
+              <span className="w-4 h-4 rounded-md bg-[#ecfdf5] border border-[#a7f3d0] text-[#15803d] text-[9px] font-bold flex items-center justify-center">M</span>
+              <span>Subuh & Malam</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#15803d]" />
               <span>Hadir</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#b45309]" />
-              <span>Izin / Terlambat</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-[#b45309]" />
+              <span>Izin / Sakit</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#be123c]" />
-              <span>Alpha</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-[#e52020]" />
+              <span>Alfa & Terlambat</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full border border-[#00652c]" />
+              <span className="w-2.5 h-2.5 rounded-full border-2 border-[#15803d] bg-[#f0fdf4]" />
               <span>Hari Ini</span>
             </div>
           </div>
 
-          <Link href="/mahasiswa/riwayat" className="text-xs font-semibold text-[#00652c] hover:underline">
+          <Link href="/mahasiswa/riwayat" className="text-xs font-semibold text-[#15803d] hover:underline flex items-center gap-1">
             Lihat Riwayat Lengkap →
           </Link>
         </div>
       </div>
 
-      {/* ── Section 4: Agenda Kegiatan Terjadwal ── */}
+      {/* ── Section 4: Agenda Kegiatan Terjadwal (Terkoneksi dengan Fasilitator) ── */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between pb-2 border-b border-[#e2e8f0]">
           <div>
             <h2 className="ui-section-title">Kegiatan Asrama Terjadwal</h2>
-            <p className="ui-meta mt-0.5">Wajib diikuti seluruh penghuni asrama.</p>
+            <p className="ui-meta mt-0.5">
+              {gedungNama
+                ? `Dijadwalkan oleh Fasilitator Gedung ${gedungNama}.`
+                : "Wajib diikuti seluruh penghuni asrama."}
+            </p>
           </div>
-          <span className="text-xs font-medium text-[#6f7a6e]">2 Kegiatan</span>
+          <span className="text-xs font-medium text-[#64748b]">
+            {isLoadingKegiatan ? "Memuat..." : `${kegiatanList.length} Kegiatan`}
+          </span>
         </div>
 
-        <div className="bg-white rounded-xl border border-[#e2e8f0] divide-y divide-[#e2e8f0]">
-          {/* Activity 1 */}
-          <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h3 className="text-base font-semibold text-[#131b2e]">Senam Pagi & Kebersihan</h3>
-              <p className="text-xs sm:text-sm text-[#6f7a6e] mt-0.5">06:30 - 08:00 WIB • Lapangan Asrama</p>
-            </div>
-            <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-[#ecfdf5] text-[#15803d] border border-[#a7f3d0] self-start sm:self-auto">
-              SELESAI
-            </span>
+        {isLoadingKegiatan ? (
+          <div className="bg-white rounded-2xl border border-[#e2e8f0] p-8 text-center text-xs text-[#64748b]">
+            Memuat kegiatan asrama terjadwal...
           </div>
+        ) : kegiatanList.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-[#e2e8f0] p-8 text-center flex flex-col items-center justify-center gap-2 shadow-xs">
+            <div className="w-10 h-10 rounded-full bg-[#f1f5f9] flex items-center justify-center text-lg text-[#64748b]">
+              📅
+            </div>
+            <h3 className="text-sm font-semibold text-[#131b2e]">Belum Ada Kegiatan Terjadwal</h3>
+            <p className="text-xs text-[#64748b] max-w-sm">
+              Fasilitator belum menjadwalkan kegiatan asrama untuk gedung Anda. Silakan periksa kembali secara berkala.
+            </p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl border border-[#e2e8f0] divide-y divide-[#f1f5f9] shadow-xs">
+            {kegiatanList.map((item) => {
+              const tanggalIndo = item.tanggal
+                ? new Intl.DateTimeFormat("id-ID", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  }).format(new Date(item.tanggal))
+                : "Jadwal Rutin";
 
-          {/* Activity 2 */}
-          <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h3 className="text-base font-semibold text-[#131b2e]">Kajian Rutin & Bina Karakter</h3>
-              <p className="text-xs sm:text-sm text-[#6f7a6e] mt-0.5">19:30 - 21:00 WIB • Masjid Asrama</p>
-            </div>
-            <Link href="/mahasiswa/presensi" className="ui-btn-primary text-xs self-start sm:self-auto">
-              Absen Sekarang
-            </Link>
+              return (
+                <div
+                  key={item.id}
+                  className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-[#fafbfc] transition-colors"
+                >
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-base font-semibold text-[#131b2e]">
+                        {item.nama_kegiatan}
+                      </h3>
+                      {item.is_aktif && !item.sudah_absen && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#ecfdf5] text-[#15803d] border border-[#a7f3d0]">
+                          AKTIF SEKARANG
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs sm:text-sm text-[#64748b]">
+                      {tanggalIndo} • {item.jam_formatted} • {item.lokasi}
+                    </p>
+                    {item.keterangan && item.keterangan !== "-" && (
+                      <p className="text-xs text-[#718096] italic mt-0.5">
+                        {item.keterangan}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    {item.can_absen ? (
+                      <Link
+                        href="/mahasiswa/presensi?sesi=kegiatan"
+                        className="ui-btn-primary text-xs !py-1.5 !px-4 rounded-xl"
+                      >
+                        Absen Sekarang
+                      </Link>
+                    ) : item.sudah_absen ? (
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#ecfdf5] text-[#15803d] border border-[#a7f3d0]">
+                        SUDAH ABSEN
+                      </span>
+                    ) : item.status === "akan_datang" ? (
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#f8fafc] text-[#64748b] border border-[#e2e8f0]">
+                        AKAN DATANG
+                      </span>
+                    ) : (
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#f1f5f9] text-[#94a3b8] border border-[#e2e8f0]">
+                        SELESAI
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

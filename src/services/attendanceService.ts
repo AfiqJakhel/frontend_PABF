@@ -22,7 +22,7 @@ export function validateAttendanceLocation(latitude: number, longitude: number, 
 }
 
 export interface SesiDetail {
-  tipe_sesi: "subuh" | "malam";
+  tipe_sesi: "subuh" | "malam" | "kegiatan";
   nama_sesi: string;
   tanggal: string;
   jam_mulai: string;
@@ -32,6 +32,8 @@ export interface SesiDetail {
   is_aktif: boolean;
   status_sesi: "aktif" | "tidak_aktif";
   pesan_status: string;
+  keterangan?: string | null;
+  gedung_nama?: string | null;
   sudah_absen: boolean;
   presensi_info?: {
     id: number;

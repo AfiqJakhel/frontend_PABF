@@ -11,7 +11,7 @@ import LoginForm from "@/components/forms/LoginForm";
 export const metadata: Metadata = {
   title: "Masuk — SIMAS Asrama Unand",
   description:
-    "Masuk ke Sistem Informasi Absensi Asrama Universitas Andalas menggunakan NIM dan kata sandi Anda.",
+    "Masuk ke SIMAS Asrama Unand — Sistem Presensi Mahasiswa dan Fasilitator berbasis Geofencing Polygon Gedung dan Foto Selfie menggunakan NIM dan kata sandi.",
 };
 
 export default function LoginPage() {

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import CameraCapture from "@/components/ui/CameraCapture";
 import LocationStatus from "@/components/ui/LocationStatus";
 import type { CapturedPhoto } from "@/hooks/useCamera";
@@ -31,7 +31,7 @@ export default function MahasiswaPresensiPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // ── Sesi Presensi State ──
-  const [selectedSesi, setSelectedSesi] = useState<"subuh" | "malam">("subuh");
+  const [selectedSesi, setSelectedSesi] = useState<"subuh" | "malam" | "kegiatan">("subuh");
   const [sesiList, setSesiList] = useState<SesiDetail[]>([]);
   const [isLoadingSesi, setIsLoadingSesi] = useState<boolean>(true);
   const [serverTimeOffset, setServerTimeOffset] = useState<number>(0);
@@ -111,15 +111,35 @@ export default function MahasiswaPresensiPage() {
   // Data sesi terpilih
   const currentSesiData = sesiList.find((s) => s.tipe_sesi === selectedSesi) ?? {
     tipe_sesi: selectedSesi,
-    nama_sesi: selectedSesi === "subuh" ? "Subuh" : "Malam",
+    nama_sesi:
+      selectedSesi === "subuh"
+        ? "Subuh"
+        : selectedSesi === "malam"
+        ? "Malam"
+        : "Kegiatan Gedung",
     tanggal: new Date().toISOString().split("T")[0],
-    jam_mulai: selectedSesi === "subuh" ? "04:30" : "19:00",
-    jam_selesai: selectedSesi === "subuh" ? "06:00" : "21:00",
+    jam_mulai:
+      selectedSesi === "subuh"
+        ? "04:30"
+        : selectedSesi === "malam"
+        ? "19:00"
+        : "-",
+    jam_selesai:
+      selectedSesi === "subuh"
+        ? "06:00"
+        : selectedSesi === "malam"
+        ? "21:00"
+        : "-",
     waktu_mulai: "",
     waktu_selesai: "",
     is_aktif: false,
-    status_sesi: "tidak_aktif" as const,
-    pesan_status: "Memuat jadwal sesi...",
+    status_sesi: "tidak_aktif" as "aktif" | "tidak_aktif",
+    pesan_status:
+      selectedSesi === "kegiatan"
+        ? "Tidak ada jadwal kegiatan yang sedang berlangsung di gedung Anda hari ini."
+        : "Memuat jadwal sesi...",
+    keterangan: null,
+    gedung_nama: null,
     sudah_absen: false,
     presensi_info: null,
   };
@@ -128,6 +148,7 @@ export default function MahasiswaPresensiPage() {
   const isSesiCurrentlyActive = useCallback(
     (s: SesiDetail | undefined) => {
       if (!s) return false;
+      if (s.tipe_sesi === "kegiatan") return Boolean(s.is_aktif);
       if (!s.waktu_mulai || !s.waktu_selesai) return s.is_aktif;
       const nowMs = currentTick + serverTimeOffset;
       const startMs = new Date(s.waktu_mulai).getTime();
@@ -137,7 +158,29 @@ export default function MahasiswaPresensiPage() {
     [currentTick, serverTimeOffset]
   );
 
+  const isSesiNotStarted = useCallback(
+    (s: SesiDetail | undefined) => {
+      if (!s || !s.waktu_mulai) return false;
+      const nowMs = currentTick + serverTimeOffset;
+      const startMs = new Date(s.waktu_mulai).getTime();
+      return nowMs < startMs;
+    },
+    [currentTick, serverTimeOffset]
+  );
+
+  const isSesiPastDeadline = useCallback(
+    (s: SesiDetail | undefined) => {
+      if (!s || !s.waktu_selesai) return false;
+      const nowMs = currentTick + serverTimeOffset;
+      const endMs = new Date(s.waktu_selesai).getTime();
+      return nowMs > endMs;
+    },
+    [currentTick, serverTimeOffset]
+  );
+
   const isCurrentSesiActive = isSesiCurrentlyActive(currentSesiData);
+  const isCurrentSesiUpcoming = isSesiNotStarted(currentSesiData);
+  const isCurrentSesiExpired = isSesiPastDeadline(currentSesiData);
 
   const checkGeofence = async (lat: number, lon: number, acc: number | null) => {
     try {
@@ -203,6 +246,7 @@ export default function MahasiswaPresensiPage() {
       if (accuracy !== null) {
         formData.append("accuracy", accuracy.toString());
       }
+
       if (note.trim()) {
         formData.append("keterangan", note.trim());
       }
@@ -236,7 +280,7 @@ export default function MahasiswaPresensiPage() {
     setStep("CAMERA");
   };
 
-  const handleSwitchTab = (sesiKey: "subuh" | "malam") => {
+  const handleSwitchTab = (sesiKey: "subuh" | "malam" | "kegiatan") => {
     setSelectedSesi(sesiKey);
     setCapturedPhoto(null);
     setSubmitResult(null);
@@ -277,96 +321,103 @@ export default function MahasiswaPresensiPage() {
             </p>
           </div>
 
-          <div className="inline-flex p-1 bg-stone-100 rounded-2xl w-full sm:w-auto" role="tablist">
-            {(["subuh", "malam"] as const).map((sesiKey) => {
-              const sData = sesiList.find((s) => s.tipe_sesi === sesiKey);
-              const isSelected = selectedSesi === sesiKey;
-              const isAktif = isSesiCurrentlyActive(sData);
-              const isSudah = sData?.sudah_absen ?? false;
+          {/* Sliding Capsule Pill Switcher */}
+          <div
+            className="relative flex items-center p-1 bg-stone-100/90 rounded-full border border-stone-200/80 w-full sm:w-[460px] h-[46px] select-none"
+            role="tablist"
+            aria-label="Pilihan Sesi Presensi"
+          >
+            {/* Moving Capsule Background */}
+            <div
+              className={`absolute top-1 bottom-1 rounded-full bg-white shadow-sm border border-stone-200/90 transition-transform duration-300 ease-out pointer-events-none ${
+                selectedSesi === "subuh"
+                  ? "translate-x-0"
+                  : selectedSesi === "malam"
+                  ? "translate-x-full"
+                  : "translate-x-[200%]"
+              }`}
+              style={{
+                left: "4px",
+                width: "calc((100% - 8px) / 3)",
+              }}
+              aria-hidden="true"
+            />
 
-              return (
-                <button
-                  key={sesiKey}
-                  type="button"
-                  role="tab"
-                  aria-selected={isSelected}
-                  onClick={() => handleSwitchTab(sesiKey)}
-                  className={`flex-1 sm:flex-initial px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                    isSelected
-                      ? "bg-white text-stone-900 shadow-sm border border-stone-200/60"
-                      : "text-stone-600 hover:text-stone-900 hover:bg-stone-200/40"
-                  }`}
-                >
-                  <span className="capitalize">{sesiKey}</span>
-                  {/* Status Indicator Dot */}
-                  {isAktif ? (
-                    <span
-                      className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-200 animate-pulse"
-                      title="Sesi sedang aktif"
-                    />
-                  ) : (
-                    <span
-                      className="w-2 h-2 rounded-full bg-stone-300"
-                      title="Sesi tidak aktif"
-                    />
-                  )}
-                  {isSudah && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full">
-                      ✓
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+            {/* Sesi Subuh Button */}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={selectedSesi === "subuh"}
+              onClick={() => handleSwitchTab("subuh")}
+              className={`flex-1 h-full relative z-10 flex items-center justify-center rounded-full text-xs sm:text-sm font-bold transition-colors duration-200 cursor-pointer ${
+                selectedSesi === "subuh" ? "text-stone-900" : "text-stone-500 hover:text-stone-900"
+              }`}
+            >
+              Subuh
+            </button>
+
+            {/* Sesi Malam Button */}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={selectedSesi === "malam"}
+              onClick={() => handleSwitchTab("malam")}
+              className={`flex-1 h-full relative z-10 flex items-center justify-center rounded-full text-xs sm:text-sm font-bold transition-colors duration-200 cursor-pointer ${
+                selectedSesi === "malam" ? "text-stone-900" : "text-stone-500 hover:text-stone-900"
+              }`}
+            >
+              Malam
+            </button>
+
+            {/* Sesi Kegiatan Button */}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={selectedSesi === "kegiatan"}
+              onClick={() => handleSwitchTab("kegiatan")}
+              className={`flex-1 h-full relative z-10 flex items-center justify-center rounded-full text-xs sm:text-sm font-bold transition-colors duration-200 cursor-pointer gap-1 sm:gap-1.5 ${
+                selectedSesi === "kegiatan" ? "text-stone-900 font-extrabold" : "text-stone-500 hover:text-stone-900"
+              }`}
+            >
+              <span>Kegiatan</span>
+            </button>
           </div>
         </div>
 
         {/* Selected Session Information Card */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-2xl bg-stone-50 border border-stone-200/70">
-          <div className="flex items-start sm:items-center gap-3.5">
-            <div
-              className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
-                isCurrentSesiActive
-                  ? "bg-emerald-100 text-emerald-700 ring-4 ring-emerald-50"
-                  : "bg-stone-200/70 text-stone-500"
-              }`}
-            >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="12 6 12 12 16 14" />
-              </svg>
+        <div className="p-4 rounded-2xl border bg-stone-50 border-stone-200/80">
+          <div>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h2 className="text-base sm:text-lg font-bold text-stone-900">
+                {selectedSesi === "kegiatan"
+                  ? currentSesiData.nama_sesi || "Kegiatan Gedung"
+                  : `Sesi ${currentSesiData.nama_sesi}`}
+              </h2>
+
+              {/* Status Badge */}
+              {isCurrentSesiActive ? (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  Sesi Aktif
+                </span>
+              ) : (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-stone-200/80 text-stone-700 border border-stone-300">
+                  Tidak Aktif
+                </span>
+              )}
+
+              {/* Status Kehadiran jika sudah absen */}
+              {currentSesiData.sudah_absen && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-800 border border-blue-200">
+                  Sudah Presensi ({currentSesiData.presensi_info?.status?.toUpperCase() ?? "TERCATAT"})
+                </span>
+              )}
             </div>
-
-            <div>
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <h2 className="text-base sm:text-lg font-bold text-stone-900">
-                  Sesi {currentSesiData.nama_sesi}
-                </h2>
-
-                {/* Status Aktif / Tidak Aktif */}
-                {isCurrentSesiActive ? (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                    <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-                    Aktif
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-stone-200/80 text-stone-700 border border-stone-300">
-                    <span className="w-2 h-2 rounded-full bg-stone-400" />
-                    Tidak Aktif
-                  </span>
-                )}
-
-                {/* Status Kehadiran jika sudah absen */}
-                {currentSesiData.sudah_absen && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200">
-                    ✓ Sudah Presensi ({currentSesiData.presensi_info?.status?.toUpperCase() ?? "TERCATAT"})
-                  </span>
-                )}
-              </div>
 
               {/* Batas Waktu Sesi (Selalu Ditampilkan!) */}
               <div className="flex items-center gap-2 text-xs sm:text-sm text-stone-600 font-medium mt-1.5 flex-wrap">
-                <span className="text-stone-500">Batas Waktu:</span>
+                <span className="text-stone-500">
+                  {selectedSesi === "kegiatan" ? "Jadwal Kegiatan:" : "Batas Waktu:"}
+                </span>
                 <span className="font-mono font-bold text-stone-900 bg-white px-2.5 py-0.5 rounded-lg border border-stone-200">
                   {currentSesiData.jam_mulai} - {currentSesiData.jam_selesai} WIB
                 </span>
@@ -378,7 +429,6 @@ export default function MahasiswaPresensiPage() {
             </div>
           </div>
         </div>
-      </div>
 
       {/* ── SUCCESS RECEIPT VIEW ── */}
       {step === "SUCCESS" && submitResult && (
@@ -571,21 +621,15 @@ export default function MahasiswaPresensiPage() {
         </div>
       )}
 
-      {/* ── KONDISI 2: SESI TIDAK AKTIF & BELUM ABSEN ── */}
-      {step !== "SUCCESS" && step !== "ERROR" && !currentSesiData.sudah_absen && !isCurrentSesiActive && (
-        <div className="max-w-xl mx-auto bg-white rounded-3xl border border-stone-200/80 p-6 sm:p-8 shadow-xs text-center space-y-4">
-          <div className="w-16 h-16 rounded-full bg-stone-100 text-stone-500 flex items-center justify-center mx-auto ring-8 ring-stone-50">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-            </svg>
-          </div>
+      {/* ── KONDISI 2A: SESI SUBUH/MALAM BELUM DIMULAI & BELUM ABSEN ── */}
+      {step !== "SUCCESS" && step !== "ERROR" && !currentSesiData.sudah_absen && selectedSesi !== "kegiatan" && isCurrentSesiUpcoming && (
+        <div className="max-w-xl mx-auto bg-white rounded-3xl border border-stone-200/80 p-6 sm:p-8 shadow-xs text-center space-y-3">
           <div>
             <h3 className="text-xl font-bold text-stone-900">
-              Presensi Belum Dapat Dilakukan
+              Sesi Belum Dimulai
             </h3>
             <p className="text-xs sm:text-sm text-stone-500 mt-1.5 max-w-md mx-auto">
-              Sesi <strong>{currentSesiData.nama_sesi}</strong> saat ini sedang tidak aktif. Presensi hanya dapat dilakukan pada rentang waktu:
+              Sesi <strong>{currentSesiData.nama_sesi}</strong> saat ini belum dimulai. Presensi akan dibuka pada rentang waktu:
             </p>
             <div className="inline-block mt-3 px-4 py-2 bg-stone-100 rounded-xl font-mono text-sm font-bold text-stone-800 border border-stone-200">
               {currentSesiData.jam_mulai} - {currentSesiData.jam_selesai} WIB
@@ -600,9 +644,61 @@ export default function MahasiswaPresensiPage() {
         </div>
       )}
 
-      {/* ── KONDISI 3: SESI AKTIF & BELUM ABSEN (MAIN FORM) ── */}
-      {step !== "SUCCESS" && step !== "ERROR" && !currentSesiData.sudah_absen && isCurrentSesiActive && (
+      {/* ── KONDISI 2B: KEGIATAN TIDAK AKTIF / BELUM DIBUKA / SELESAI ── */}
+      {step !== "SUCCESS" && step !== "ERROR" && !currentSesiData.sudah_absen && selectedSesi === "kegiatan" && !isCurrentSesiActive && (
+        <div className="max-w-xl mx-auto bg-white rounded-3xl border border-stone-200/80 p-6 sm:p-8 shadow-xs text-center space-y-3">
+          <div>
+            <h3 className="text-xl font-bold text-stone-900">
+              Presensi Kegiatan Belum / Tidak Tersedia
+            </h3>
+            <p className="text-xs sm:text-sm text-stone-600 mt-1.5 max-w-md mx-auto leading-relaxed">
+              {currentSesiData.pesan_status || "Presensi hanya dapat dilakukan jika ada kegiatan gedung yang sedang aktif dibuka oleh Fasilitator Anda."}
+            </p>
+            {currentSesiData.jam_mulai !== "-" && (
+              <div className="inline-block mt-3 px-4 py-2 bg-stone-100 rounded-xl font-mono text-sm font-bold text-stone-800 border border-stone-200">
+                Jadwal: {currentSesiData.jam_mulai} - {currentSesiData.jam_selesai} WIB
+              </div>
+            )}
+          </div>
+          <p className="text-xs text-stone-400">
+            * Kamera dan formulir presensi hanya akan terbuka otomatis saat sesi kegiatan berstatus aktif oleh Fasilitator gedung.
+          </p>
+          <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
+            <button
+              type="button"
+              onClick={() => fetchSesi(false)}
+              className="py-2.5 px-5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 font-semibold text-xs sm:text-sm transition-all text-center cursor-pointer"
+            >
+              Perbarui Status Sesi
+            </button>
+            <Link
+              href="/mahasiswa/riwayat"
+              className="py-2.5 px-5 rounded-xl border border-stone-200 bg-white text-stone-700 font-semibold text-xs sm:text-sm hover:bg-stone-50 transition-all text-center"
+            >
+              Lihat Riwayat Presensi
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* ── KONDISI 3: SESI AKTIF ATAU SESI TERLEWAT/TERLAMBAT (MAIN FORM) ── */}
+      {step !== "SUCCESS" &&
+        step !== "ERROR" &&
+        !currentSesiData.sudah_absen &&
+        (selectedSesi === "kegiatan" ? isCurrentSesiActive : !isCurrentSesiUpcoming) && (
         <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Late attendance alert banner if session past deadline */}
+          {isCurrentSesiExpired && selectedSesi !== "kegiatan" && (
+            <div className="lg:col-span-12 p-4 rounded-2xl bg-rose-50 border border-rose-200 shadow-xs">
+              <h4 className="text-sm font-bold text-rose-900 m-0">
+                Batas Waktu Sesi Terlewat (Status Alfa) — Presensi Terlambat Dibuka
+              </h4>
+              <p className="text-xs text-rose-700 m-0 mt-1 leading-relaxed">
+                Batas waktu reguler sesi <strong>{currentSesiData.nama_sesi}</strong> telah berakhir pada pukul {currentSesiData.jam_selesai} WIB. Anda saat ini berstatus <strong>Alfa</strong> pada sesi ini, namun Anda tetap diperkenankan mengambil presensi susulan sekarang dengan status <strong>Terlambat</strong>.
+              </p>
+            </div>
+          )}
+
           {/* Left Column: Camera Viewfinder */}
           <div className="lg:col-span-7 bg-white rounded-3xl border border-stone-200/80 p-4 sm:p-6 shadow-xs flex flex-col gap-4">
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
@@ -705,6 +801,45 @@ export default function MahasiswaPresensiPage() {
               )}
             </div>
 
+            {/* Agenda Kegiatan Resmi dari Fasilitator */}
+            {selectedSesi === "kegiatan" && (
+              <div className="bg-stone-50 rounded-3xl border border-stone-200/90 p-5 sm:p-6 shadow-xs flex flex-col gap-3">
+                <div className="border-b border-stone-200 pb-3">
+                  <h3 className="text-sm font-bold text-stone-900">
+                    Kegiatan Asrama Terjadwal
+                  </h3>
+                  <p className="text-[11px] text-stone-500">
+                    Diselenggarakan oleh Fasilitator Gedung Anda
+                  </p>
+                </div>
+
+                <div className="bg-white p-3.5 rounded-2xl border border-stone-200/80 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs sm:text-sm font-bold text-stone-900">
+                      {currentSesiData.nama_sesi}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      Aktif Berlangsung
+                    </span>
+                  </div>
+                  {currentSesiData.keterangan && (
+                    <p className="text-xs text-stone-600 leading-relaxed">
+                      {currentSesiData.keterangan}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-2 text-xs text-stone-500 pt-1 border-t border-stone-100 font-mono">
+                    <span>{currentSesiData.jam_mulai} - {currentSesiData.jam_selesai} WIB</span>
+                    {currentSesiData.gedung_nama && (
+                      <>
+                        <span className="text-stone-300">•</span>
+                        <span className="font-sans font-medium text-stone-600">{currentSesiData.gedung_nama}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Step 3: Notes & Final Submit Button */}
             <div className="bg-white rounded-3xl border border-stone-200/80 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
               <div>
@@ -758,7 +893,7 @@ export default function MahasiswaPresensiPage() {
                       <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                       <polyline points="22 4 12 14.01 9 11.01" />
                     </svg>
-                    Kirim Bukti Presensi
+                    {isCurrentSesiExpired ? "Kirim Presensi (Terlambat)" : "Kirim Bukti Presensi"}
                   </>
                 )}
               </button>

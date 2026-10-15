@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/apiClient";
+import ForgotPasswordModal from "@/components/feedback/ForgotPasswordModal";
 
 interface LoginResponseData {
   access_token: string;
@@ -30,6 +31,7 @@ export default function LoginForm() {
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
 
   useEffect(() => {
     const savedNim = localStorage.getItem("remember_nim") ?? "";
@@ -130,7 +132,7 @@ export default function LoginForm() {
             htmlFor="nim-input"
             data-ui-style="ui-style-15yn7oz"
           >
-            NIM atau Email
+            NIM
           </label>
           <div className="relative flex items-center">
             <span className="absolute pointer-events-none" data-ui-style="ui-style-z2gzjk">
@@ -166,6 +168,7 @@ export default function LoginForm() {
             <button
               type="button"
               className="transition-colors hover:underline focus:outline-none"
+              onClick={() => setShowForgotPasswordModal(true)}
               data-ui-style="ui-style-2uj3ig"
             >
               Lupa Kata Sandi?
@@ -269,9 +272,15 @@ export default function LoginForm() {
         <p
           data-ui-style="ui-style-eq5npc"
         >
-          Kendala akun atau lupa kata sandi? Hubungi pihak pengelola asrama.
+          Kendala akun atau lupa kata sandi? Hubungi fasilitator gedung atau pihak pengelola asrama.
         </p>
       </div>
+
+      {/* ── Modal Bantuan Lupa Kata Sandi ── */}
+      <ForgotPasswordModal
+        isOpen={showForgotPasswordModal}
+        onClose={() => setShowForgotPasswordModal(false)}
+      />
     </div>
   );
 }
