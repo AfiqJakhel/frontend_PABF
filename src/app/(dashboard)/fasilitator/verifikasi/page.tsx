@@ -148,31 +148,10 @@ export default function FasilitatorVerifikasiPage() {
   const requestSeq = useRef(0);
   const activeDateRef = useRef(activeDate);
 
-  // Modal & menu states
+  // Modal states
   const [detailItem, setDetailItem] = useState<PresensiVerifikasiItem | null>(null);
   const [rejectItem, setRejectItem] = useState<PresensiVerifikasiItem | null>(null);
   const [rejectReason, setRejectReason] = useState<string>("");
-  const [openMenuUserId, setOpenMenuUserId] = useState<number | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  // Close the row action menu on outside click or Escape
-  useEffect(() => {
-    if (openMenuUserId === null) return;
-    const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpenMenuUserId(null);
-      }
-    };
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpenMenuUserId(null);
-    };
-    document.addEventListener("mousedown", handleClick);
-    document.addEventListener("keydown", handleKey);
-    return () => {
-      document.removeEventListener("mousedown", handleClick);
-      document.removeEventListener("keydown", handleKey);
-    };
-  }, [openMenuUserId]);
 
   // Backend scopes by logged-in facilitator's building and today's date; the client only picks sesi.
   const fetchVerifikasi = useCallback(async () => {
@@ -265,29 +244,19 @@ export default function FasilitatorVerifikasiPage() {
   }, []);
 
   const handleApprove = async (item: PresensiVerifikasiItem) => {
+    if (!item.has_record || !item.id) {
+      setNotification({ type: "error", message: "Mahasiswa belum melakukan presensi." });
+      return;
+    }
     try {
       setActionLoadingId(item.user_id);
-      let res;
-      if (item.id) {
-        res = await api.patch<{ success: boolean; message: string }>(
-          `/api/fasil/presensi/${item.id}/status`,
-          {
-            status: "hadir",
-            keterangan: "Diverifikasi & disetujui oleh Fasilitator",
-          }
-        );
-      } else {
-        res = await api.post<{ success: boolean; message: string }>(
-          "/api/fasil/presensi/manual",
-          {
-            user_id: item.user_id,
-            sesi: item.sesi,
-            tanggal: item.tanggal,
-            status: "hadir",
-            keterangan: "Diverifikasi hadir manual oleh Fasilitator",
-          }
-        );
-      }
+      const res = await api.patch<{ success: boolean; message: string }>(
+        `/api/fasil/presensi/${item.id}/status`,
+        {
+          status: "hadir",
+          keterangan: "Diverifikasi & disetujui oleh Fasilitator",
+        }
+      );
 
       if (res.success) {
         setDetailItem(null);
@@ -303,7 +272,10 @@ export default function FasilitatorVerifikasiPage() {
   };
 
   const openRejectModal = (item: PresensiVerifikasiItem) => {
-    setOpenMenuUserId(null);
+    if (!item.has_record || !item.id) {
+      setNotification({ type: "error", message: "Mahasiswa belum melakukan presensi." });
+      return;
+    }
     setRejectItem(item);
     setRejectReason("");
   };
@@ -325,9 +297,22 @@ export default function FasilitatorVerifikasiPage() {
       : "";
 
   const canApprove = (item: PresensiVerifikasiItem) =>
-    item.status.toLowerCase() !== "hadir";
+    Boolean(
+      item.has_record &&
+      item.id &&
+      item.waktu &&
+      item.status.toLowerCase() !== "hadir" &&
+      item.status.toLowerCase() !== "belum_absen"
+    );
+
   const canReject = (item: PresensiVerifikasiItem) =>
-    item.status.toLowerCase() !== "alfa";
+    Boolean(
+      item.has_record &&
+      item.id &&
+      item.waktu &&
+      item.status.toLowerCase() !== "alfa" &&
+      item.status.toLowerCase() !== "belum_absen"
+    );
 
   const handleConfirmReject = async () => {
     if (!rejectItem) return;
@@ -569,7 +554,7 @@ export default function FasilitatorVerifikasiPage() {
           {/* Column header (desktop only) */}
           <div
             role="row"
-            className="hidden lg:grid grid-cols-[48px_minmax(0,2.2fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1.2fr)_minmax(0,1.5fr)_minmax(0,0.9fr)_56px] gap-4 px-5 py-3 border-b border-[#e2e8f0] bg-[#f8fafc] rounded-t-xl text-xs font-semibold text-[#6f7a6e]"
+            className="hidden lg:grid grid-cols-[48px_minmax(0,2.2fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1.2fr)_minmax(0,1.5fr)_minmax(0,1fr)] gap-4 px-5 py-3 border-b border-[#e2e8f0] bg-[#f8fafc] rounded-t-xl text-xs font-semibold text-[#6f7a6e]"
           >
             <span role="columnheader">Foto</span>
             <span role="columnheader">Mahasiswa</span>
@@ -578,14 +563,11 @@ export default function FasilitatorVerifikasiPage() {
             <span role="columnheader">Waktu</span>
             <span role="columnheader">Lokasi</span>
             <span role="columnheader">Status</span>
-            <span role="columnheader" className="text-right">Aksi</span>
           </div>
 
           <div className="divide-y divide-[#f1f5f9]">
           {attendances.map((item) => {
             const isOutsideZone = item.has_record && !item.location_valid;
-            const isMenuOpen = openMenuUserId === item.user_id;
-            const isBusy = actionLoadingId === item.user_id;
             const thumbUrl = getPhotoUrl(item);
 
             return (
@@ -597,9 +579,8 @@ export default function FasilitatorVerifikasiPage() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") setDetailItem(item);
                 }}
-                className={`relative grid grid-cols-[48px_minmax(0,1fr)_auto] lg:grid-cols-[48px_minmax(0,2.2fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1.2fr)_minmax(0,1.5fr)_minmax(0,0.9fr)_56px] items-center gap-x-4 gap-y-1 px-4 sm:px-5 py-3.5 cursor-pointer transition-colors last:rounded-b-xl focus:outline-none focus-visible:bg-[#f1f5f9] ${
-                  isMenuOpen ? "bg-[#f1f5f9]" : "hover:bg-[#f8fafc]"
-                }`}
+                title="Klik untuk melihat detail presensi"
+                className="relative grid grid-cols-[48px_1fr] lg:grid-cols-[48px_minmax(0,2.2fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1.2fr)_minmax(0,1.5fr)_minmax(0,1fr)] items-center gap-x-4 gap-y-1 px-4 sm:px-5 py-3.5 cursor-pointer transition-colors hover:bg-[#f8fafc] last:rounded-b-xl focus:outline-none focus-visible:bg-[#f1f5f9]"
               >
                 {/* Thumbnail / Avatar */}
                 <div role="cell" className="self-start lg:self-center">
@@ -660,76 +641,6 @@ export default function FasilitatorVerifikasiPage() {
                 </div>
                 <div role="cell" className="hidden lg:block">
                   <StatusBadge status={item.status} />
-                </div>
-
-                {/* Actions menu */}
-                <div
-                  role="cell"
-                  className="relative flex justify-end self-start lg:self-center"
-                  ref={isMenuOpen ? menuRef : undefined}
-                  onClick={(e) => e.stopPropagation()}
-                  onKeyDown={(e) => e.stopPropagation()}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setOpenMenuUserId(isMenuOpen ? null : item.user_id)}
-                    disabled={isBusy}
-                    aria-haspopup="menu"
-                    aria-expanded={isMenuOpen}
-                    aria-label={`Aksi untuk ${item.nama_mahasiswa}`}
-                    className="h-10 w-10 flex items-center justify-center rounded-lg text-[#475569] hover:bg-[#e2e8f0] hover:text-[#131b2e] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00652c] disabled:opacity-50 cursor-pointer"
-                  >
-                    {isBusy ? (
-                      <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <circle cx="5" cy="12" r="2" />
-                        <circle cx="12" cy="12" r="2" />
-                        <circle cx="19" cy="12" r="2" />
-                      </svg>
-                    )}
-                  </button>
-
-                  {isMenuOpen && (
-                    <div
-                      role="menu"
-                      className="absolute right-0 top-full mt-1 z-30 w-48 rounded-lg border border-[#e2e8f0] bg-white py-1 shadow-lg"
-                    >
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setOpenMenuUserId(null);
-                          setDetailItem(item);
-                        }}
-                        className="w-full text-left px-4 py-2.5 text-sm text-[#131b2e] hover:bg-[#f1f5f9] cursor-pointer"
-                      >
-                        Lihat Detail
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        disabled={!canApprove(item)}
-                        onClick={() => {
-                          setOpenMenuUserId(null);
-                          handleApprove(item);
-                        }}
-                        className="w-full text-left px-4 py-2.5 text-sm font-medium text-[#15803d] hover:bg-[#ecfdf5] disabled:text-[#94a3b8] disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer"
-                      >
-                        Setujui
-                      </button>
-                      <div className="my-1 border-t border-[#f1f5f9]" />
-                      <button
-                        type="button"
-                        role="menuitem"
-                        disabled={!canReject(item)}
-                        onClick={() => openRejectModal(item)}
-                        className="w-full text-left px-4 py-2.5 text-sm font-medium text-[#be123c] hover:bg-[#fff1f2] disabled:text-[#94a3b8] disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer"
-                      >
-                        Tolak
-                      </button>
-                    </div>
-                  )}
                 </div>
               </div>
             );
@@ -842,9 +753,17 @@ export default function FasilitatorVerifikasiPage() {
               <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 px-5 sm:px-6 py-4 border-t border-[#e2e8f0] bg-[#f8fafc] sm:rounded-b-2xl">
                 <button
                   type="button"
+                  onClick={() => setDetailItem(null)}
+                  className="h-11 px-5 bg-white hover:bg-[#f1f5f9] text-[#475569] border border-[#d0d7de] rounded-lg text-sm font-semibold transition-colors cursor-pointer"
+                >
+                  Tutup
+                </button>
+                <button
+                  type="button"
                   onClick={() => openRejectModal(detailItem)}
                   disabled={isBusy || !canReject(detailItem)}
-                  className="h-11 px-5 bg-white hover:bg-[#fff1f2] text-[#be123c] border border-[#fecdd3] rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                  title={!detailItem.has_record ? "Mahasiswa belum melakukan presensi" : undefined}
+                  className="h-11 px-5 bg-white hover:bg-[#fff1f2] text-[#be123c] border border-[#fecdd3] rounded-lg text-sm font-semibold transition-colors disabled:opacity-40 disabled:border-[#e2e8f0] disabled:text-[#94a3b8] disabled:hover:bg-white disabled:cursor-not-allowed cursor-pointer"
                 >
                   Tolak
                 </button>
@@ -852,7 +771,8 @@ export default function FasilitatorVerifikasiPage() {
                   type="button"
                   onClick={() => handleApprove(detailItem)}
                   disabled={isBusy || !canApprove(detailItem)}
-                  className="h-11 px-5 bg-[#00652c] hover:bg-[#004d22] text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                  title={!detailItem.has_record ? "Mahasiswa belum melakukan presensi" : undefined}
+                  className="h-11 px-5 bg-[#00652c] hover:bg-[#004d22] text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-40 disabled:bg-[#94a3b8] disabled:cursor-not-allowed cursor-pointer"
                 >
                   {isBusy ? "Memproses..." : "Setujui"}
                 </button>

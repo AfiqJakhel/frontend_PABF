@@ -461,7 +461,7 @@ export default function MahasiswaDashboardPage() {
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between pb-2 border-b border-[#e2e8f0]">
           <div>
-            <h2 className="ui-section-title">Kegiatan Asrama Terjadwal</h2>
+            <h2 className="ui-section-title">Agenda Kegiatan Asrama</h2>
             <p className="ui-meta mt-0.5">
               {gedungNama
                 ? `Dijadwalkan oleh Fasilitator Gedung ${gedungNama}.`

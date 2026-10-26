@@ -7,13 +7,20 @@ interface KamarItem {
   id: number;
   nomor_kamar: string;
   lantai: number;
+  kapasitas?: number;
   total_penghuni: number;
+  sisa_slot?: number;
+  is_penuh?: boolean;
 }
 
 interface GedungData {
   id: number;
   nama_gedung: string;
+  jenis_penghuni?: string;
+  kapasitas_maksimal_gedung?: number;
   total_kamar: number;
+  total_penghuni?: number;
+  sisa_slot_gedung?: number;
   daftar_kamar: KamarItem[];
 }
 
@@ -32,13 +39,189 @@ interface MahasiswaItem {
   created_at: string | null;
 }
 
+function RoomPicker({
+  daftarKamar,
+  selectedKamarId,
+  onSelectKamar,
+  currentKamarId,
+  allowAuto = false,
+}: {
+  daftarKamar: KamarItem[];
+  selectedKamarId: string;
+  onSelectKamar: (kamarId: string, nomorKamar: string, lantai: number) => void;
+  currentKamarId?: number;
+  allowAuto?: boolean;
+}) {
+  const [activeFloor, setActiveFloor] = useState<number>(1);
+  const [searchRoom, setSearchRoom] = useState<string>("");
+
+  useEffect(() => {
+    if (selectedKamarId) {
+      const found = daftarKamar.find((k) => String(k.id) === selectedKamarId);
+      if (found) {
+        setActiveFloor(found.lantai);
+      }
+    }
+  }, [selectedKamarId, daftarKamar]);
+
+  const floors = [1, 2, 3];
+
+  const filteredRooms = daftarKamar.filter((k) => {
+    if (searchRoom.trim()) {
+      return k.nomor_kamar.toLowerCase().includes(searchRoom.trim().toLowerCase());
+    }
+    return k.lantai === activeFloor;
+  });
+
+  const selectedRoomObj = daftarKamar.find((k) => String(k.id) === selectedKamarId);
+
+  return (
+    <div className="flex flex-col gap-2.5 p-3.5 bg-[#f8fafc] border border-[#d0d7de] rounded-xl">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <label className="text-xs font-bold text-[#131b2e] flex items-center gap-1.5">
+          <span>Pindah Kamar (Maksimal 4 Mahasiswa per Kamar)</span>
+        </label>
+        {selectedRoomObj && (
+          <span className="text-[11px] font-semibold text-[#00652c] bg-[#ecfdf5] border border-[#a7f3d0] px-2.5 py-0.5 rounded-full">
+            Kamar {selectedRoomObj.nomor_kamar} (Lt. {selectedRoomObj.lantai}) • {selectedRoomObj.total_penghuni}/4 Terisi
+          </span>
+        )}
+      </div>
+
+      {allowAuto && (
+        <button
+          type="button"
+          onClick={() => onSelectKamar("", "", 1)}
+          className={`w-full py-2 px-3 text-xs font-semibold rounded-lg border text-left transition-all flex items-center justify-between cursor-pointer ${
+            selectedKamarId === ""
+              ? "bg-[#ecfdf5] border-[#00652c] text-[#00652c] ring-1 ring-[#00652c]"
+              : "bg-white border-[#d0d7de] text-[#3f493f] hover:border-[#00652c]"
+          }`}
+        >
+          <span className="flex items-center gap-2">
+            <span>🎲</span>
+            <span>Atur Otomatis / Acak oleh Sistem (Disarankan)</span>
+          </span>
+          {selectedKamarId === "" && (
+            <span className="text-[11px] font-bold text-[#00652c]">Aktif ✓</span>
+          )}
+        </button>
+      )}
+
+      {/* Floor navigation tabs & Search */}
+      <div className="flex flex-col sm:flex-row gap-2 items-center justify-between pt-1">
+        <div className="flex gap-1.5 w-full sm:w-auto">
+          {floors.map((fl) => {
+            const countFloor = daftarKamar.filter((k) => k.lantai === fl);
+            const availableFloor = countFloor.filter((k) => k.total_penghuni < 4 || k.id === currentKamarId).length;
+            const isActive = activeFloor === fl && !searchRoom.trim();
+            return (
+              <button
+                key={fl}
+                type="button"
+                onClick={() => {
+                  setSearchRoom("");
+                  setActiveFloor(fl);
+                }}
+                className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  isActive
+                    ? "bg-[#00652c] text-white shadow-xs"
+                    : "bg-white border border-[#d0d7de] text-[#3f493f] hover:bg-gray-50"
+                }`}
+              >
+                Lantai {fl} ({availableFloor}/16)
+              </button>
+            );
+          })}
+        </div>
+        <div className="w-full sm:w-44">
+          <input
+            type="text"
+            placeholder="Cari no. kamar..."
+            value={searchRoom}
+            onChange={(e) => setSearchRoom(e.target.value)}
+            className="w-full h-8 px-2.5 bg-white border border-[#d0d7de] focus:border-[#00652c] rounded-lg text-xs text-[#131b2e] outline-none"
+          />
+        </div>
+      </div>
+
+      {/* Rooms Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-h-56 overflow-y-auto p-1">
+        {filteredRooms.map((k) => {
+          const isCurrent = currentKamarId === k.id;
+          const isFull = k.total_penghuni >= 4 && !isCurrent;
+          const isSelected = selectedKamarId === String(k.id);
+
+          return (
+            <button
+              key={k.id}
+              type="button"
+              disabled={isFull}
+              onClick={() => onSelectKamar(String(k.id), k.nomor_kamar, k.lantai)}
+              title={isFull ? `Kamar ${k.nomor_kamar} sudah penuh (maksimal 4 orang)` : `Kamar ${k.nomor_kamar}`}
+              className={`relative p-2.5 rounded-lg border text-left transition-all flex flex-col justify-between ${
+                isFull
+                  ? "bg-[#f1f5f9] border-[#e2e8f0] text-[#94a3b8] cursor-not-allowed opacity-60"
+                  : isSelected
+                  ? "bg-[#ecfdf5] border-[#00652c] text-[#00652c] ring-2 ring-[#00652c] shadow-xs cursor-pointer"
+                  : "bg-white border-[#d0d7de] text-[#131b2e] hover:border-[#00652c] hover:bg-[#f0fdf4] cursor-pointer"
+              }`}
+            >
+              <div className="flex items-center justify-between w-full">
+                <span className={`text-xs font-bold font-mono ${isFull ? "line-through text-[#94a3b8]" : ""}`}>
+                  Kamar {k.nomor_kamar}
+                </span>
+                {isCurrent ? (
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 bg-[#dbeafe] text-[#1e40af] rounded">
+                    Saat Ini
+                  </span>
+                ) : isFull ? (
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 bg-[#fee2e2] text-[#991b1b] rounded">
+                    PENUH
+                  </span>
+                ) : (
+                  <span className="text-[9px] font-medium text-[#166534]">
+                    {4 - k.total_penghuni} slot
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between mt-2 pt-1 border-t border-gray-100 text-[10px]">
+                <span className="text-[#64748b]">Lt. {k.lantai}</span>
+                <span className={`font-semibold ${isFull ? "text-[#991b1b]" : "text-[#334155]"}`}>
+                  {k.total_penghuni}/4 org
+                </span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      {filteredRooms.length === 0 && (
+        <div className="text-center py-6 text-xs text-[#64748b]">
+          Tidak ada kamar yang sesuai pencarian.
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function FasilitatorMahasiswaPage() {
   const [gedung, setGedung] = useState<GedungData | null>(null);
   const [mahasiswaList, setMahasiswaList] = useState<MahasiswaItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const [filterKamar, setFilterKamar] = useState<string>("all");
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  // Debounce search input (400ms) agar tidak memicu HTTP request pada setiap ketikan huruf
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery.trim());
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Modals
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
@@ -87,9 +270,9 @@ export default function FasilitatorMahasiswaPage() {
         setGedung(resGedung.data);
       }
 
-      // 2. Ambil data mahasiswa binaan
+      // 2. Ambil data mahasiswa binaan (menggunakan debounced search)
       const params = new URLSearchParams();
-      if (searchQuery) params.append("search", searchQuery);
+      if (debouncedSearch) params.append("search", debouncedSearch);
       if (filterKamar && filterKamar !== "all") params.append("kamar", filterKamar);
 
       const queryStr = params.toString() ? `?${params.toString()}` : "";
@@ -107,7 +290,7 @@ export default function FasilitatorMahasiswaPage() {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, filterKamar]);
+  }, [debouncedSearch, filterKamar]);
 
   useEffect(() => {
     fetchGedungDanMahasiswa();
@@ -129,7 +312,7 @@ export default function FasilitatorMahasiswaPage() {
         nama_panggilan: formData.nama_panggilan.trim() || undefined,
         email: formData.email.trim() || undefined,
         asal: formData.asal.trim() || undefined,
-        jekel: formData.jekel || undefined,
+        jekel: gedung?.jenis_penghuni || formData.jekel || "L",
         // Password awal otomatis menggunakan NIM jika dikosongkan
         password: formData.password.trim() || formData.nim.trim(),
       };
@@ -275,7 +458,7 @@ export default function FasilitatorMahasiswaPage() {
       nomor_kamar: "",
       lantai: 1,
       asal: "",
-      jekel: "L",
+      jekel: gedung?.jenis_penghuni || "L",
       password: "",
     });
   };
@@ -291,7 +474,7 @@ export default function FasilitatorMahasiswaPage() {
       nomor_kamar: mhs.nomor_kamar,
       lantai: mhs.lantai,
       asal: mhs.asal === "-" ? "" : mhs.asal,
-      jekel: mhs.jekel === "-" ? "L" : mhs.jekel,
+      jekel: mhs.jekel === "-" ? (gedung?.jenis_penghuni || "L") : mhs.jekel,
       password: "",
     });
     setShowEditModal(true);
@@ -321,16 +504,33 @@ export default function FasilitatorMahasiswaPage() {
       {/* Header: Title, Building & Count */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b border-[#e2e8f0]">
         <div>
-          <h1 className="ui-page-title">
-            Data Master Mahasiswa
-          </h1>
-          <div className="flex items-center gap-2 mt-2 text-sm text-[#6f7a6e]">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="ui-page-title">
+              Data Master Mahasiswa
+            </h1>
+            {gedung?.jenis_penghuni && (
+              <span
+                className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
+                  gedung.jenis_penghuni === "L"
+                    ? "bg-[#eff6ff] text-[#1d4ed8] border-[#bfdbfe]"
+                    : "bg-[#fdf2f8] text-[#be185d] border-[#fbcfe8]"
+                }`}
+              >
+                {gedung.jenis_penghuni === "L" ? "♂ Asrama Putra (Laki-laki)" : "♀ Asrama Putri (Perempuan)"}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 mt-2 text-sm text-[#6f7a6e] flex-wrap">
             <span className="font-semibold text-[#131b2e]">
               {gedung?.nama_gedung || "Gedung Binaan"}
             </span>
             <span>•</span>
             <span className="text-[#00652c] font-medium">
-              {loading ? "Memuat..." : `${mahasiswaList.length} mahasiswa terdaftar`}
+              {loading ? "Memuat..." : `${mahasiswaList.length} / 192 Mahasiswa Terdaftar`}
+            </span>
+            <span>•</span>
+            <span className="text-[#64748b] text-xs">
+              48 Kamar (3 Lantai @ 16 Kamar, Maks. 4 Org/Kamar)
             </span>
           </div>
         </div>
@@ -341,7 +541,7 @@ export default function FasilitatorMahasiswaPage() {
             type="button"
             onClick={handleDownloadTemplate}
             className="ui-btn-secondary text-xs sm:text-sm"
-            title="Unduh format template CSV minimalis (NIM, Nama Panjang, Nama Panggilan, Email, Asal Daerah)"
+            title="Unduh format template CSV (NIM, Nama Panjang, Nama Panggilan, Jenis Kelamin, Email, Asal Daerah)"
           >
             Download Template CSV
           </button>
@@ -391,10 +591,10 @@ export default function FasilitatorMahasiswaPage() {
             onChange={(e) => setFilterKamar(e.target.value)}
             className="h-10 px-3 bg-white border border-[#d0d7de] focus:border-[#00652c] rounded-lg text-xs sm:text-sm font-medium text-[#131b2e] outline-none cursor-pointer"
           >
-            <option value="all">Semua Kamar</option>
+            <option value="all">Semua Kamar (48 Kamar)</option>
             {gedung?.daftar_kamar.map((k) => (
               <option key={k.id} value={k.nomor_kamar}>
-                Kamar {k.nomor_kamar} (Lantai {k.lantai})
+                Kamar {k.nomor_kamar} (Lantai {k.lantai}) - {k.total_penghuni}/4 org
               </option>
             ))}
           </select>
@@ -434,6 +634,15 @@ export default function FasilitatorMahasiswaPage() {
                             &quot;{mhs.nama_panggilan}&quot;
                           </span>
                         )}
+                        <span
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                            mhs.jekel === "P"
+                              ? "bg-[#fdf2f8] text-[#be185d] border border-[#fbcfe8]"
+                              : "bg-[#eff6ff] text-[#1d4ed8] border border-[#bfdbfe]"
+                          }`}
+                        >
+                          {mhs.jekel === "P" ? "Perempuan" : "Laki-laki"}
+                        </span>
                       </div>
                       <span className="text-xs font-mono text-[#6f7a6e] block mt-0.5">{mhs.nim}</span>
                     </td>
@@ -472,20 +681,31 @@ export default function FasilitatorMahasiswaPage() {
       {/* Modal: Tambah Mahasiswa */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-lg w-full p-6 border border-[#e2e8f0] shadow-xl">
+          <div className="bg-white rounded-xl max-w-2xl w-full p-6 border border-[#e2e8f0] shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-[#e2e8f0] pb-3.5 mb-4">
               <div>
                 <h3 className="text-base font-bold text-[#131b2e]">
                   Tambah Mahasiswa Penghuni
                 </h3>
-                <span className="text-xs font-semibold text-[#00652c] bg-[#ecfdf5] border border-[#a7f3d0] px-2 py-0.5 rounded-full mt-1 inline-block">
-                  Lokasi: {gedung?.nama_gedung}
-                </span>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs font-semibold text-[#00652c] bg-[#ecfdf5] border border-[#a7f3d0] px-2 py-0.5 rounded-full inline-block">
+                    Lokasi: {gedung?.nama_gedung}
+                  </span>
+                  <span
+                    className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
+                      gedung?.jenis_penghuni === "L"
+                        ? "bg-[#eff6ff] text-[#1d4ed8] border-[#bfdbfe]"
+                        : "bg-[#fdf2f8] text-[#be185d] border-[#fbcfe8]"
+                    }`}
+                  >
+                    {gedung?.jenis_penghuni === "L" ? "Khusus Mahasiswa Putra (L)" : "Khusus Mahasiswi Putri (P)"}
+                  </span>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowAddModal(false)}
-                className="text-[#6f7a6e] hover:text-[#131b2e] text-base p-1"
+                className="text-[#6f7a6e] hover:text-[#131b2e] text-base p-1 cursor-pointer"
                 aria-label="Tutup"
               >
                 ✕
@@ -493,7 +713,7 @@ export default function FasilitatorMahasiswaPage() {
             </div>
 
             <form onSubmit={handleAddSubmit} className="flex flex-col gap-3.5">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-[#131b2e] mb-1">
                     NIM <span className="text-[#be123c]">*</span>
@@ -522,7 +742,7 @@ export default function FasilitatorMahasiswaPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-[#131b2e] mb-1">
                     Nama Panggilan
@@ -549,7 +769,7 @@ export default function FasilitatorMahasiswaPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-[#131b2e] mb-1">
                     Email Mahasiswa
@@ -574,30 +794,26 @@ export default function FasilitatorMahasiswaPage() {
                     className="w-full h-10 px-3 border border-[#d0d7de] focus:border-[#00652c] rounded-lg text-sm font-mono text-[#131b2e] outline-none"
                   />
                   <span className="text-[11px] text-[#6f7a6e] mt-1 block">
-                    Default otomatis NIM agar mahasiswa bisa ganti sendiri.
+                    Default otomatis NIM agar mahasiswa bisa login dan ganti sendiri.
                   </span>
                 </div>
               </div>
 
+              {/* Interactive Room Picker */}
               <div>
-                <label className="block text-xs font-semibold text-[#131b2e] mb-1">
-                  Penempatan Kamar ({gedung?.nama_gedung})
-                </label>
-                <select
-                  value={formData.kamar_id}
-                  onChange={(e) => setFormData({ ...formData, kamar_id: e.target.value })}
-                  className="w-full h-10 px-3 border border-[#d0d7de] focus:border-[#00652c] rounded-lg text-sm font-medium text-[#131b2e] outline-none"
-                >
-                  <option value="">-- Atur Otomatis / Acak oleh Sistem (Disarankan) --</option>
-                  {gedung?.daftar_kamar.map((k) => (
-                    <option key={k.id} value={k.id}>
-                      Kamar {k.nomor_kamar} (Lantai {k.lantai}) - {k.total_penghuni} penghuni
-                    </option>
-                  ))}
-                </select>
-                <span className="text-[11px] text-[#6f7a6e] mt-1 block">
-                  Jika dibiarkan otomatis, sistem akan mengalokasikan nomor kamar dan lantai secara seimbang.
-                </span>
+                <RoomPicker
+                  daftarKamar={gedung?.daftar_kamar || []}
+                  selectedKamarId={formData.kamar_id}
+                  allowAuto={true}
+                  onSelectKamar={(kId, nKamar, lt) => {
+                    setFormData({
+                      ...formData,
+                      kamar_id: kId,
+                      nomor_kamar: nKamar,
+                      lantai: lt,
+                    });
+                  }}
+                />
               </div>
 
               <div className="flex justify-end gap-2 mt-4 pt-3.5 border-t border-[#e2e8f0]">
@@ -624,20 +840,20 @@ export default function FasilitatorMahasiswaPage() {
       {/* Modal: Edit Mahasiswa */}
       {showEditModal && selectedStudent && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-lg w-full p-6 border border-[#e2e8f0] shadow-xl">
+          <div className="bg-white rounded-xl max-w-2xl w-full p-6 border border-[#e2e8f0] shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-[#e2e8f0] pb-3.5 mb-4">
               <div>
                 <h3 className="text-base font-bold text-[#131b2e]">
                   Edit Data Mahasiswa
                 </h3>
                 <span className="text-xs text-[#6f7a6e]">
-                  NIM: {selectedStudent.nim} • {gedung?.nama_gedung}
+                  NIM: {selectedStudent.nim} • {gedung?.nama_gedung} • Kamar Saat Ini: {selectedStudent.nomor_kamar}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => setShowEditModal(false)}
-                className="text-[#6f7a6e] hover:text-[#131b2e] text-base p-1"
+                className="text-[#6f7a6e] hover:text-[#131b2e] text-base p-1 cursor-pointer"
                 aria-label="Tutup"
               >
                 ✕
@@ -645,7 +861,7 @@ export default function FasilitatorMahasiswaPage() {
             </div>
 
             <form onSubmit={handleEditSubmit} className="flex flex-col gap-3.5">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-[#131b2e] mb-1">
                     Nama Panjang
@@ -672,23 +888,7 @@ export default function FasilitatorMahasiswaPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-[#131b2e] mb-1">
-                    Pindah Kamar ({gedung?.nama_gedung})
-                  </label>
-                  <select
-                    value={formData.kamar_id}
-                    onChange={(e) => setFormData({ ...formData, kamar_id: e.target.value })}
-                    className="w-full h-10 px-3 border border-[#d0d7de] focus:border-[#00652c] rounded-lg text-sm font-medium text-[#131b2e] outline-none"
-                  >
-                    {gedung?.daftar_kamar.map((k) => (
-                      <option key={k.id} value={k.id}>
-                        Kamar {k.nomor_kamar} (Lantai {k.lantai})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-[#131b2e] mb-1">
                     Asal Daerah
@@ -700,18 +900,38 @@ export default function FasilitatorMahasiswaPage() {
                     className="w-full h-10 px-3 border border-[#d0d7de] focus:border-[#00652c] rounded-lg text-sm text-[#131b2e] outline-none"
                   />
                 </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#131b2e] mb-1">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full h-10 px-3 border border-[#d0d7de] focus:border-[#00652c] rounded-lg text-sm text-[#131b2e] outline-none"
+                  />
+                </div>
               </div>
 
+              {/* Interactive Room Picker for Moving Rooms */}
               <div>
-                <label className="block text-xs font-semibold text-[#131b2e] mb-1">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full h-10 px-3 border border-[#d0d7de] focus:border-[#00652c] rounded-lg text-sm text-[#131b2e] outline-none"
+                <RoomPicker
+                  daftarKamar={gedung?.daftar_kamar || []}
+                  selectedKamarId={formData.kamar_id}
+                  currentKamarId={selectedStudent.kamar_id}
+                  allowAuto={false}
+                  onSelectKamar={(kId, nKamar, lt) => {
+                    setFormData({
+                      ...formData,
+                      kamar_id: kId,
+                      nomor_kamar: nKamar,
+                      lantai: lt,
+                    });
+                  }}
                 />
+                <span className="text-[11px] text-[#6f7a6e] mt-1.5 block">
+                  Catatan: Kamar yang sudah terisi 4 orang (PENUH) dinonaktifkan otomatis dan tidak dapat dipilih.
+                </span>
               </div>
 
               <div className="flex justify-end gap-2 mt-4 pt-3.5 border-t border-[#e2e8f0]">
@@ -769,20 +989,31 @@ export default function FasilitatorMahasiswaPage() {
       {/* Modal: Import CSV */}
       {showImportModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-lg w-full p-6 border border-[#e2e8f0] shadow-xl">
+          <div className="bg-white rounded-xl max-w-lg w-full p-6 border border-[#e2e8f0] shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-[#e2e8f0] pb-3.5 mb-4">
               <div>
                 <h3 className="text-base font-bold text-[#131b2e]">
                   Import Mahasiswa Massal (CSV)
                 </h3>
-                <span className="text-xs font-semibold text-[#00652c] bg-[#ecfdf5] border border-[#a7f3d0] px-2 py-0.5 rounded-full mt-1 inline-block">
-                  Target: {gedung?.nama_gedung}
-                </span>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs font-semibold text-[#00652c] bg-[#ecfdf5] border border-[#a7f3d0] px-2 py-0.5 rounded-full inline-block">
+                    Target: {gedung?.nama_gedung}
+                  </span>
+                  <span
+                    className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
+                      gedung?.jenis_penghuni === "L"
+                        ? "bg-[#eff6ff] text-[#1d4ed8] border-[#bfdbfe]"
+                        : "bg-[#fdf2f8] text-[#be185d] border-[#fbcfe8]"
+                    }`}
+                  >
+                    {gedung?.jenis_penghuni === "L" ? "Khusus Laki-laki (L)" : "Khusus Perempuan (P)"}
+                  </span>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowImportModal(false)}
-                className="text-[#6f7a6e] hover:text-[#131b2e] text-base p-1"
+                className="text-[#6f7a6e] hover:text-[#131b2e] text-base p-1 cursor-pointer"
                 aria-label="Tutup"
               >
                 ✕
@@ -792,22 +1023,24 @@ export default function FasilitatorMahasiswaPage() {
             <form onSubmit={handleImportSubmit} className="flex flex-col gap-4">
               {/* Petunjuk Format Template CSV */}
               <div className="p-3.5 bg-[#f0fdf4] border border-[#bbf7d0] rounded-lg text-xs space-y-2">
-                <div className="font-semibold text-[#166534] flex items-center gap-1.5">
-                  Format Template CSV Baru
+                <div className="font-semibold text-[#166534] flex items-center justify-between">
+                  <span>Format Template CSV (Skenario B Asrama)</span>
                 </div>
                 <p className="text-[#166534] leading-relaxed">
-                  Template CSV cukup memuat <strong>5 kolom</strong>:
+                  Template CSV memuat <strong>6 kolom</strong> berikut:
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   <span className="px-2 py-0.5 bg-white border border-[#86efac] text-[#166534] rounded font-mono font-medium text-[11px]">NIM</span>
                   <span className="px-2 py-0.5 bg-white border border-[#86efac] text-[#166534] rounded font-mono font-medium text-[11px]">Nama Panjang</span>
                   <span className="px-2 py-0.5 bg-white border border-[#86efac] text-[#166534] rounded font-mono font-medium text-[11px]">Nama Panggilan</span>
+                  <span className="px-2 py-0.5 bg-[#dcfce7] border border-[#22c55e] text-[#15803d] rounded font-mono font-bold text-[11px]">Jenis Kelamin</span>
                   <span className="px-2 py-0.5 bg-white border border-[#86efac] text-[#166534] rounded font-mono font-medium text-[11px]">Email</span>
                   <span className="px-2 py-0.5 bg-white border border-[#86efac] text-[#166534] rounded font-mono font-medium text-[11px]">Asal Daerah</span>
                 </div>
-                <div className="text-[11px] text-[#15803d] space-y-1 pt-1 border-t border-[#bbf7d0]">
-                  <div>✓ <strong>Kamar & Lantai:</strong> Diatur otomatis / acak oleh sistem ke gedung binaan Anda ({gedung?.nama_gedung}).</div>
-                  <div>✓ <strong>Password Awal:</strong> Otomatis menggunakan <strong>NIM</strong> masing-masing mahasiswa agar mahasiswa bisa login dan mengganti password secara mandiri.</div>
+                <div className="text-[11px] text-[#15803d] space-y-1 pt-1.5 border-t border-[#bbf7d0]">
+                  <div>🔒 <strong>Validasi Gender Ketat:</strong> Mahasiswa perempuan <strong>dilarang masuk</strong> ke asrama putra (dan sebaliknya). Baris dengan jenis kelamin berbeda akan otomatis ditolak.</div>
+                  <div>🏢 <strong>Kapasitas Kamar:</strong> Maksimal 4 orang per kamar (total 192 mahasiswa per gedung). Sistem akan mengalokasikan kamar yang masih memiliki slot kosong.</div>
+                  <div>🔑 <strong>Password Awal:</strong> Otomatis menggunakan <strong>NIM</strong> masing-masing mahasiswa.</div>
                 </div>
               </div>
 
