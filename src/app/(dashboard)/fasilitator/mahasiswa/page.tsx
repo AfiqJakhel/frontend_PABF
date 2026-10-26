@@ -21,6 +21,7 @@ interface MahasiswaItem {
   id: number;
   nim: string;
   nama: string;
+  nama_panggilan?: string;
   email: string;
   asal: string;
   jekel: string;
@@ -50,13 +51,14 @@ export default function FasilitatorMahasiswaPage() {
   const [formData, setFormData] = useState({
     nim: "",
     nama: "",
+    nama_panggilan: "",
     email: "",
     kamar_id: "",
     nomor_kamar: "",
     lantai: 1,
     asal: "",
     jekel: "L",
-    password: "password123",
+    password: "",
   });
   const [submitting, setSubmitting] = useState<boolean>(false);
 
@@ -122,20 +124,23 @@ export default function FasilitatorMahasiswaPage() {
     try {
       setSubmitting(true);
       const payload: Record<string, unknown> = {
-        nim: formData.nim,
-        nama: formData.nama,
-        email: formData.email || undefined,
-        asal: formData.asal || undefined,
+        nim: formData.nim.trim(),
+        nama: formData.nama.trim(),
+        nama_panggilan: formData.nama_panggilan.trim() || undefined,
+        email: formData.email.trim() || undefined,
+        asal: formData.asal.trim() || undefined,
         jekel: formData.jekel || undefined,
-        password: formData.password || "password123",
+        // Password awal otomatis menggunakan NIM jika dikosongkan
+        password: formData.password.trim() || formData.nim.trim(),
       };
 
       if (formData.kamar_id) {
         payload.kamar_id = Number(formData.kamar_id);
       } else if (formData.nomor_kamar) {
-        payload.nomor_kamar = formData.nomor_kamar;
+        payload.nomor_kamar = formData.nomor_kamar.trim();
         payload.lantai = Number(formData.lantai) || 1;
       }
+      // Jika kamar_id & nomor_kamar kosong, backend akan mengalokasikan kamar otomatis/acak
 
       await api.post("/api/fasil/mahasiswa", payload);
       showToast("success", `Mahasiswa ${formData.nama} berhasil ditambahkan ke ${gedung?.nama_gedung}.`);
@@ -157,16 +162,17 @@ export default function FasilitatorMahasiswaPage() {
     try {
       setSubmitting(true);
       const payload: Record<string, unknown> = {
-        nama: formData.nama,
-        email: formData.email || undefined,
-        asal: formData.asal || undefined,
+        nama: formData.nama.trim(),
+        nama_panggilan: formData.nama_panggilan.trim() || undefined,
+        email: formData.email.trim() || undefined,
+        asal: formData.asal.trim() || undefined,
         jekel: formData.jekel || undefined,
       };
 
       if (formData.kamar_id) {
         payload.kamar_id = Number(formData.kamar_id);
       } else if (formData.nomor_kamar) {
-        payload.nomor_kamar = formData.nomor_kamar;
+        payload.nomor_kamar = formData.nomor_kamar.trim();
       }
 
       await api.put(`/api/fasil/mahasiswa/${selectedStudent.id}`, payload);
@@ -241,7 +247,6 @@ export default function FasilitatorMahasiswaPage() {
     const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
     const url = `${API_BASE_URL}/api/fasil/mahasiswa/template-csv`;
     
-    // Download using link with auth header fetch or trigger
     fetch(url, {
       headers: {
         Authorization: `Bearer ${token || ""}`,
@@ -264,13 +269,14 @@ export default function FasilitatorMahasiswaPage() {
     setFormData({
       nim: "",
       nama: "",
+      nama_panggilan: "",
       email: "",
-      kamar_id: gedung?.daftar_kamar?.[0]?.id ? String(gedung.daftar_kamar[0].id) : "",
+      kamar_id: "",
       nomor_kamar: "",
       lantai: 1,
       asal: "",
       jekel: "L",
-      password: "password123",
+      password: "",
     });
   };
 
@@ -279,6 +285,7 @@ export default function FasilitatorMahasiswaPage() {
     setFormData({
       nim: mhs.nim,
       nama: mhs.nama,
+      nama_panggilan: mhs.nama_panggilan && mhs.nama_panggilan !== "-" ? mhs.nama_panggilan : "",
       email: mhs.email === "-" ? "" : mhs.email,
       kamar_id: mhs.kamar_id ? String(mhs.kamar_id) : "",
       nomor_kamar: mhs.nomor_kamar,
@@ -328,13 +335,13 @@ export default function FasilitatorMahasiswaPage() {
           </div>
         </div>
 
-        {/* Action Buttons: Clean text-focused buttons without excessive icons */}
+        {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
             onClick={handleDownloadTemplate}
             className="ui-btn-secondary text-xs sm:text-sm"
-            title="Unduh format template CSV untuk gedung ini"
+            title="Unduh format template CSV minimalis (NIM, Nama Panjang, Nama Panggilan, Email, Asal Daerah)"
           >
             Download Template CSV
           </button>
@@ -364,12 +371,12 @@ export default function FasilitatorMahasiswaPage() {
         </div>
       </div>
 
-      {/* Filter and Search Bar: Minimalist with clean borders */}
+      {/* Filter and Search Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-2">
         <div className="flex-1 max-w-md">
           <input
             type="text"
-            placeholder="Cari mahasiswa (nama atau NIM)..."
+            placeholder="Cari mahasiswa (nama, panggilan, NIM, asal)..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full h-10 px-3.5 bg-white border border-[#d0d7de] focus:border-[#00652c] rounded-lg text-sm text-[#131b2e] placeholder:text-[#6f7a6e] outline-none transition-colors"
@@ -394,8 +401,8 @@ export default function FasilitatorMahasiswaPage() {
         </div>
       </div>
 
-      {/* Student List Table: Clean, Responsive with controlled horizontal scroll */}
-      <div className="bg-white border border-[#e2e8f0] rounded-lg overflow-hidden">
+      {/* Student List Table */}
+      <div className="bg-white border border-[#e2e8f0] rounded-lg overflow-hidden shadow-xs">
         {loading ? (
           <div className="p-12 text-center text-sm text-[#6f7a6e]">
             Memuat data mahasiswa {gedung?.nama_gedung || ""}...
@@ -411,7 +418,6 @@ export default function FasilitatorMahasiswaPage() {
                 <tr>
                   <th className="px-5 py-3.5">NIM & Mahasiswa</th>
                   <th className="px-5 py-3.5">Kamar & Lantai</th>
-                  <th className="px-5 py-3.5">Jenis Kelamin</th>
                   <th className="px-5 py-3.5">Asal Daerah</th>
                   <th className="px-5 py-3.5">Email</th>
                   <th className="px-5 py-3.5 text-right">Aksi</th>
@@ -421,15 +427,19 @@ export default function FasilitatorMahasiswaPage() {
                 {mahasiswaList.map((mhs) => (
                   <tr key={mhs.id} className="hover:bg-[#f8fafc] transition-colors">
                     <td className="px-5 py-4">
-                      <span className="font-semibold text-[#131b2e] block">{mhs.nama}</span>
-                      <span className="text-xs font-mono text-[#6f7a6e]">{mhs.nim}</span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-[#131b2e]">{mhs.nama}</span>
+                        {mhs.nama_panggilan && mhs.nama_panggilan !== "-" && (
+                          <span className="text-[11px] font-medium px-2 py-0.5 bg-[#ecfdf5] text-[#15803d] rounded border border-[#a7f3d0]">
+                            &quot;{mhs.nama_panggilan}&quot;
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs font-mono text-[#6f7a6e] block mt-0.5">{mhs.nim}</span>
                     </td>
                     <td className="px-5 py-4">
                       <span className="font-medium text-[#131b2e]">Kamar {mhs.nomor_kamar}</span>
                       <span className="block text-xs text-[#6f7a6e]">Lantai {mhs.lantai}</span>
-                    </td>
-                    <td className="px-5 py-4 text-[#3f493f]">
-                      {mhs.jekel === "L" ? "Laki-laki" : mhs.jekel === "P" ? "Perempuan" : "-"}
                     </td>
                     <td className="px-5 py-4 text-[#3f493f]">{mhs.asal || "-"}</td>
                     <td className="px-5 py-4 font-mono text-xs text-[#6f7a6e]">{mhs.email || "-"}</td>
@@ -499,14 +509,14 @@ export default function FasilitatorMahasiswaPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-[#131b2e] mb-1">
-                    Nama Lengkap <span className="text-[#be123c]">*</span>
+                    Nama Panjang <span className="text-[#be123c]">*</span>
                   </label>
                   <input
                     type="text"
                     required
                     value={formData.nama}
                     onChange={(e) => setFormData({ ...formData, nama: e.target.value })}
-                    placeholder="Nama Mahasiswa"
+                    placeholder="Nama Lengkap"
                     className="w-full h-10 px-3 border border-[#d0d7de] focus:border-[#00652c] rounded-lg text-sm text-[#131b2e] outline-none"
                   />
                 </div>
@@ -515,65 +525,15 @@ export default function FasilitatorMahasiswaPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-[#131b2e] mb-1">
-                    Pilih Kamar ({gedung?.nama_gedung})
+                    Nama Panggilan
                   </label>
-                  <select
-                    value={formData.kamar_id}
-                    onChange={(e) => setFormData({ ...formData, kamar_id: e.target.value })}
-                    className="w-full h-10 px-3 border border-[#d0d7de] focus:border-[#00652c] rounded-lg text-sm font-medium text-[#131b2e] outline-none"
-                  >
-                    <option value="">-- Buat / Ketik Kamar Manual --</option>
-                    {gedung?.daftar_kamar.map((k) => (
-                      <option key={k.id} value={k.id}>
-                        Kamar {k.nomor_kamar} (Lantai {k.lantai}) - {k.total_penghuni} org
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {!formData.kamar_id && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-xs font-semibold text-[#131b2e] mb-1">
-                        No. Kamar
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.nomor_kamar}
-                        onChange={(e) => setFormData({ ...formData, nomor_kamar: e.target.value })}
-                        placeholder="201"
-                        className="w-full h-10 px-3 border border-[#d0d7de] focus:border-[#00652c] rounded-lg text-sm font-mono text-[#131b2e] outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-[#131b2e] mb-1">
-                        Lantai
-                      </label>
-                      <input
-                        type="number"
-                        value={formData.lantai}
-                        onChange={(e) => setFormData({ ...formData, lantai: Number(e.target.value) })}
-                        min={1}
-                        max={10}
-                        className="w-full h-10 px-3 border border-[#d0d7de] focus:border-[#00652c] rounded-lg text-sm text-[#131b2e] outline-none"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-[#131b2e] mb-1">
-                    Jenis Kelamin
-                  </label>
-                  <select
-                    value={formData.jekel}
-                    onChange={(e) => setFormData({ ...formData, jekel: e.target.value })}
+                  <input
+                    type="text"
+                    value={formData.nama_panggilan}
+                    onChange={(e) => setFormData({ ...formData, nama_panggilan: e.target.value })}
+                    placeholder="Nama Panggilan"
                     className="w-full h-10 px-3 border border-[#d0d7de] focus:border-[#00652c] rounded-lg text-sm text-[#131b2e] outline-none"
-                  >
-                    <option value="L">Laki-laki</option>
-                    <option value="P">Perempuan</option>
-                  </select>
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-[#131b2e] mb-1">
@@ -610,9 +570,34 @@ export default function FasilitatorMahasiswaPage() {
                     type="text"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder={`Otomatis NIM (${formData.nim || '221152xxxx'})`}
                     className="w-full h-10 px-3 border border-[#d0d7de] focus:border-[#00652c] rounded-lg text-sm font-mono text-[#131b2e] outline-none"
                   />
+                  <span className="text-[11px] text-[#6f7a6e] mt-1 block">
+                    Default otomatis NIM agar mahasiswa bisa ganti sendiri.
+                  </span>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#131b2e] mb-1">
+                  Penempatan Kamar ({gedung?.nama_gedung})
+                </label>
+                <select
+                  value={formData.kamar_id}
+                  onChange={(e) => setFormData({ ...formData, kamar_id: e.target.value })}
+                  className="w-full h-10 px-3 border border-[#d0d7de] focus:border-[#00652c] rounded-lg text-sm font-medium text-[#131b2e] outline-none"
+                >
+                  <option value="">-- Atur Otomatis / Acak oleh Sistem (Disarankan) --</option>
+                  {gedung?.daftar_kamar.map((k) => (
+                    <option key={k.id} value={k.id}>
+                      Kamar {k.nomor_kamar} (Lantai {k.lantai}) - {k.total_penghuni} penghuni
+                    </option>
+                  ))}
+                </select>
+                <span className="text-[11px] text-[#6f7a6e] mt-1 block">
+                  Jika dibiarkan otomatis, sistem akan mengalokasikan nomor kamar dan lantai secara seimbang.
+                </span>
               </div>
 
               <div className="flex justify-end gap-2 mt-4 pt-3.5 border-t border-[#e2e8f0]">
@@ -660,17 +645,31 @@ export default function FasilitatorMahasiswaPage() {
             </div>
 
             <form onSubmit={handleEditSubmit} className="flex flex-col gap-3.5">
-              <div>
-                <label className="block text-xs font-semibold text-[#131b2e] mb-1">
-                  Nama Lengkap
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.nama}
-                  onChange={(e) => setFormData({ ...formData, nama: e.target.value })}
-                  className="w-full h-10 px-3 border border-[#d0d7de] focus:border-[#00652c] rounded-lg text-sm text-[#131b2e] outline-none"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-[#131b2e] mb-1">
+                    Nama Panjang
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.nama}
+                    onChange={(e) => setFormData({ ...formData, nama: e.target.value })}
+                    className="w-full h-10 px-3 border border-[#d0d7de] focus:border-[#00652c] rounded-lg text-sm text-[#131b2e] outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#131b2e] mb-1">
+                    Nama Panggilan
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.nama_panggilan}
+                    onChange={(e) => setFormData({ ...formData, nama_panggilan: e.target.value })}
+                    placeholder="Nama Panggilan"
+                    className="w-full h-10 px-3 border border-[#d0d7de] focus:border-[#00652c] rounded-lg text-sm text-[#131b2e] outline-none"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -692,33 +691,6 @@ export default function FasilitatorMahasiswaPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-[#131b2e] mb-1">
-                    Jenis Kelamin
-                  </label>
-                  <select
-                    value={formData.jekel}
-                    onChange={(e) => setFormData({ ...formData, jekel: e.target.value })}
-                    className="w-full h-10 px-3 border border-[#d0d7de] focus:border-[#00652c] rounded-lg text-sm text-[#131b2e] outline-none"
-                  >
-                    <option value="L">Laki-laki</option>
-                    <option value="P">Perempuan</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-[#131b2e] mb-1">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full h-10 px-3 border border-[#d0d7de] focus:border-[#00652c] rounded-lg text-sm text-[#131b2e] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[#131b2e] mb-1">
                     Asal Daerah
                   </label>
                   <input
@@ -728,6 +700,18 @@ export default function FasilitatorMahasiswaPage() {
                     className="w-full h-10 px-3 border border-[#d0d7de] focus:border-[#00652c] rounded-lg text-sm text-[#131b2e] outline-none"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#131b2e] mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full h-10 px-3 border border-[#d0d7de] focus:border-[#00652c] rounded-lg text-sm text-[#131b2e] outline-none"
+                />
               </div>
 
               <div className="flex justify-end gap-2 mt-4 pt-3.5 border-t border-[#e2e8f0]">
@@ -806,8 +790,25 @@ export default function FasilitatorMahasiswaPage() {
             </div>
 
             <form onSubmit={handleImportSubmit} className="flex flex-col gap-4">
-              <div className="text-xs text-[#6f7a6e] leading-relaxed">
-                Seluruh baris mahasiswa yang diimpor akan <strong>terkunci secara otomatis</strong> ke gedung binaan Anda ({gedung?.nama_gedung}).
+              {/* Petunjuk Format Template CSV */}
+              <div className="p-3.5 bg-[#f0fdf4] border border-[#bbf7d0] rounded-lg text-xs space-y-2">
+                <div className="font-semibold text-[#166534] flex items-center gap-1.5">
+                  Format Template CSV Baru
+                </div>
+                <p className="text-[#166534] leading-relaxed">
+                  Template CSV cukup memuat <strong>5 kolom</strong>:
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  <span className="px-2 py-0.5 bg-white border border-[#86efac] text-[#166534] rounded font-mono font-medium text-[11px]">NIM</span>
+                  <span className="px-2 py-0.5 bg-white border border-[#86efac] text-[#166534] rounded font-mono font-medium text-[11px]">Nama Panjang</span>
+                  <span className="px-2 py-0.5 bg-white border border-[#86efac] text-[#166534] rounded font-mono font-medium text-[11px]">Nama Panggilan</span>
+                  <span className="px-2 py-0.5 bg-white border border-[#86efac] text-[#166534] rounded font-mono font-medium text-[11px]">Email</span>
+                  <span className="px-2 py-0.5 bg-white border border-[#86efac] text-[#166534] rounded font-mono font-medium text-[11px]">Asal Daerah</span>
+                </div>
+                <div className="text-[11px] text-[#15803d] space-y-1 pt-1 border-t border-[#bbf7d0]">
+                  <div>✓ <strong>Kamar & Lantai:</strong> Diatur otomatis / acak oleh sistem ke gedung binaan Anda ({gedung?.nama_gedung}).</div>
+                  <div>✓ <strong>Password Awal:</strong> Otomatis menggunakan <strong>NIM</strong> masing-masing mahasiswa agar mahasiswa bisa login dan mengganti password secara mandiri.</div>
+                </div>
               </div>
 
               <div className="border border-dashed border-[#d0d7de] p-6 text-center rounded-lg bg-[#f8fafc]">

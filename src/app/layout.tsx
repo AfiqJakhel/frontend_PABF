@@ -27,13 +27,17 @@ export const metadata: Metadata = {
   keywords: ["absensi", "asrama", "unand", "universitas andalas", "simas"],
 };
 
+import { AuthProvider } from "@/store/AuthProvider";
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="id"
       className={`${inter.variable} ${plusJakartaSans.variable} ${jetbrainsMono.variable} h-full`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }

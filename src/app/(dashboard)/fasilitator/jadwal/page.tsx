@@ -82,13 +82,11 @@ export default function FasilitatorJadwalPage() {
   const [formTanggal, setFormTanggal] = useState<string>("");
   const [formJamMulai, setFormJamMulai] = useState<string>("");
   const [formKegiatan, setFormKegiatan] = useState<string>("");
-  const [customKegiatanText, setCustomKegiatanText] = useState<string>("");
   const [formKeterangan, setFormKeterangan] = useState<string>("");
 
   // UI Dropdown & Datepicker Popover State
   const [isDatePickerOpen, setIsDatePickerOpen] = useState<boolean>(false);
   const [isTimePickerOpen, setIsTimePickerOpen] = useState<boolean>(false);
-  const [isKegiatanOpen, setIsKegiatanOpen] = useState<boolean>(false);
 
   // Calendar View Month/Year State
   const [calendarViewDate, setCalendarViewDate] = useState<Date>(new Date());
@@ -99,7 +97,6 @@ export default function FasilitatorJadwalPage() {
 
   const datePickerRef = useRef<HTMLDivElement>(null);
   const timePickerRef = useRef<HTMLDivElement>(null);
-  const kegiatanRef = useRef<HTMLDivElement>(null);
 
   // Fetch daftar jadwal
   const fetchJadwal = useCallback(async () => {
@@ -135,9 +132,6 @@ export default function FasilitatorJadwalPage() {
       }
       if (timePickerRef.current && !timePickerRef.current.contains(event.target as Node)) {
         setIsTimePickerOpen(false);
-      }
-      if (kegiatanRef.current && !kegiatanRef.current.contains(event.target as Node)) {
-        setIsKegiatanOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -182,7 +176,6 @@ export default function FasilitatorJadwalPage() {
     setFormTanggal("");
     setFormJamMulai("");
     setFormKegiatan("");
-    setCustomKegiatanText("");
     setFormKeterangan("");
     setFormError(null);
     setCalendarViewDate(new Date(currentServerDate));
@@ -210,15 +203,7 @@ export default function FasilitatorJadwalPage() {
       jamStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
     }
     setFormJamMulai(jamStr);
-
-    if (PRESET_KEGIATAN.includes(item.nama_sesi)) {
-      setFormKegiatan(item.nama_sesi);
-      setCustomKegiatanText("");
-    } else {
-      setFormKegiatan("Lainnya (Ketik Manual Kegiatan)");
-      setCustomKegiatanText(item.nama_sesi);
-    }
-
+    setFormKegiatan(item.nama_sesi || "");
     setFormKeterangan(item.keterangan || "");
     setFormError(null);
     if (dateStr) {
@@ -253,12 +238,9 @@ export default function FasilitatorJadwalPage() {
     }
 
     // 3. Validasi Kegiatan
-    const finalKegiatan = formKegiatan === "Lainnya (Ketik Manual Kegiatan)"
-      ? customKegiatanText.trim()
-      : formKegiatan;
-
+    const finalKegiatan = formKegiatan.trim();
     if (!finalKegiatan) {
-      setFormError("Silakan pilih atau masukkan nama kegiatan.");
+      setFormError("Silakan masukkan nama kegiatan.");
       return;
     }
 
@@ -590,7 +572,6 @@ export default function FasilitatorJadwalPage() {
                   onClick={() => {
                     setIsDatePickerOpen(!isDatePickerOpen);
                     setIsTimePickerOpen(false);
-                    setIsKegiatanOpen(false);
                   }}
                   className={`w-full h-[42px] px-3.5 bg-[#ffffff] border text-left flex items-center justify-between text-sm rounded-lg transition-all cursor-pointer ${
                     isDatePickerOpen ? "border-[#76b900] ring-2 ring-[#76b900]/20" : "border-[#cbd5e1] hover:border-[#94a3b8]"
@@ -699,37 +680,23 @@ export default function FasilitatorJadwalPage() {
                   )}
                 </div>
 
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsTimePickerOpen(!isTimePickerOpen);
-                      setIsDatePickerOpen(false);
-                      setIsKegiatanOpen(false);
-                    }}
-                    className={`flex-1 h-[42px] px-3.5 bg-[#ffffff] border text-left flex items-center justify-between text-sm rounded-lg transition-all cursor-pointer ${
-                      isTimePickerOpen ? "border-[#76b900] ring-2 ring-[#76b900]/20" : "border-[#cbd5e1] hover:border-[#94a3b8]"
-                    }`}
-                  >
-                    <span className={formJamMulai ? "text-[#0f172a] font-bold font-mono" : "text-[#94a3b8]"}>
-                      {formJamMulai ? `${formJamMulai} WIB` : "Pilih Jam Mulai"}
-                    </span>
-                    <svg className="w-4 h-4 text-[#64748b]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </button>
-
-                  {/* Manual Time Input */}
-                  <input
-                    type="time"
-                    value={formJamMulai}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setFormJamMulai(val);
-                    }}
-                    className="w-[110px] h-[42px] px-2 text-center text-xs font-mono font-bold bg-[#ffffff] border border-[#cbd5e1] rounded-lg focus:outline-none focus:border-[#76b900] focus:ring-2 focus:ring-[#76b900]/20"
-                  />
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsTimePickerOpen(!isTimePickerOpen);
+                    setIsDatePickerOpen(false);
+                  }}
+                  className={`w-full h-[42px] px-3.5 bg-[#ffffff] border text-left flex items-center justify-between text-sm rounded-lg transition-all cursor-pointer ${
+                    isTimePickerOpen ? "border-[#76b900] ring-2 ring-[#76b900]/20" : "border-[#cbd5e1] hover:border-[#94a3b8]"
+                  }`}
+                >
+                  <span className={formJamMulai ? "text-[#0f172a] font-bold font-mono" : "text-[#94a3b8]"}>
+                    {formJamMulai ? `${formJamMulai} WIB` : "Pilih Jam Mulai"}
+                  </span>
+                  <svg className="w-4 h-4 text-[#64748b]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </button>
 
                 {/* Popover Slot Waktu */}
                 {isTimePickerOpen && (
@@ -774,73 +741,25 @@ export default function FasilitatorJadwalPage() {
                 )}
               </div>
 
-              {/* ── 3. CUSTOM DROPDOWN KEGIATAN (ROUNDED-LG) ── */}
-              <div className="relative" ref={kegiatanRef}>
+              {/* ── 3. INPUT MANUAL KEGIATAN ASRAMA (TANPA POPUP SCROLLBAR) ── */}
+              <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-[#334155] mb-1.5">
                   Kegiatan Asrama <span className="text-[#e11d48]">*</span>
                 </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsKegiatanOpen(!isKegiatanOpen);
-                    setIsDatePickerOpen(false);
-                    setIsTimePickerOpen(false);
-                  }}
-                  className={`w-full h-[42px] px-3.5 bg-[#ffffff] border text-left flex items-center justify-between text-sm rounded-lg transition-all cursor-pointer ${
-                    isKegiatanOpen ? "border-[#76b900] ring-2 ring-[#76b900]/20" : "border-[#cbd5e1] hover:border-[#94a3b8]"
-                  }`}
-                >
-                  <span className={formKegiatan ? "text-[#0f172a] font-medium" : "text-[#94a3b8]"}>
-                    {formKegiatan || "Pilih Kegiatan Asrama"}
-                  </span>
-                  <svg
-                    className={`w-4 h-4 text-[#64748b] transition-transform ${isKegiatanOpen ? "rotate-180" : ""}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-
-                {/* Popover Opsi Kegiatan */}
-                {isKegiatanOpen && (
-                  <div className="absolute top-[100%] left-0 mt-1 w-full bg-[#ffffff] border border-[#e2e8f0] rounded-xl z-30 shadow-xl max-h-[220px] overflow-y-auto p-1">
-                    {PRESET_KEGIATAN.map((kegiatan) => {
-                      const isSelected = formKegiatan === kegiatan;
-                      return (
-                        <button
-                          key={kegiatan}
-                          type="button"
-                          onClick={() => {
-                            setFormKegiatan(kegiatan);
-                            setIsKegiatanOpen(false);
-                          }}
-                          className={`w-full text-left px-3.5 py-2.5 text-xs rounded-lg transition-colors flex items-center justify-between cursor-pointer ${
-                            isSelected
-                              ? "bg-[#76b900] text-[#000000] font-bold"
-                              : "text-[#1e293b] hover:bg-[#f1f5f9]"
-                          }`}
-                        >
-                          <span>{kegiatan}</span>
-                          {isSelected && <span>✓</span>}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Input Manual Jika Memilih 'Lainnya (Ketik Manual Kegiatan)' */}
-                {formKegiatan === "Lainnya (Ketik Manual Kegiatan)" && (
-                  <input
-                    type="text"
-                    required
-                    value={customKegiatanText}
-                    onChange={(e) => setCustomKegiatanText(e.target.value)}
-                    placeholder="Masukkan nama kegiatan khusus..."
-                    className="mt-2 w-full h-[40px] px-3 text-xs bg-[#ffffff] border border-[#cbd5e1] rounded-lg focus:outline-none focus:border-[#76b900] focus:ring-2 focus:ring-[#76b900]/20"
-                  />
-                )}
+                <input
+                  type="text"
+                  required
+                  list="kegiatan-preset-list"
+                  value={formKegiatan}
+                  onChange={(e) => setFormKegiatan(e.target.value)}
+                  placeholder="Ketik nama kegiatan asrama (misal: Apel Malam, Senam Pagi, dll.)..."
+                  className="w-full h-[42px] px-3.5 text-sm bg-[#ffffff] border border-[#cbd5e1] rounded-lg focus:outline-none focus:border-[#76b900] focus:ring-2 focus:ring-[#76b900]/20 text-[#0f172a] placeholder-[#94a3b8]"
+                />
+                <datalist id="kegiatan-preset-list">
+                  {PRESET_KEGIATAN.filter((k) => !k.includes("Lainnya")).map((kegiatan) => (
+                    <option key={kegiatan} value={kegiatan} />
+                  ))}
+                </datalist>
               </div>
 
               {/* ── 4. LOKASI / KETERANGAN (OPSIONAL) ── */}

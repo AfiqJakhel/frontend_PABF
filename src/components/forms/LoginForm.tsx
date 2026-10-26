@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/apiClient";
+import { useAuth } from "@/hooks/useAuth";
 import ForgotPasswordModal from "@/components/feedback/ForgotPasswordModal";
 
 interface LoginResponseData {
@@ -23,6 +24,7 @@ interface LoginResponse {
 
 export default function LoginForm() {
   const router = useRouter();
+  const { login: authLogin } = useAuth();
 
   // Baca savedNim di useEffect supaya tidak ada hydration mismatch
   const [nim, setNim] = useState("");
@@ -62,23 +64,14 @@ export default function LoginForm() {
         return;
       }
 
-      // Simpan token dan data user ke localStorage
-      localStorage.setItem("access_token", result.data.access_token);
-      localStorage.setItem("user", JSON.stringify(result.data.user));
-
       if (rememberMe) {
         localStorage.setItem("remember_nim", nim.trim());
       } else {
         localStorage.removeItem("remember_nim");
       }
 
-      const userRole = result.data.user?.role;
-      // Backend menyimpan role sebagai 'fasil' atau 'admin'
-      if (userRole === "admin" || userRole === "fasil" || userRole === "fasilitator") {
-        router.push("/fasilitator/dashboard");
-      } else {
-        router.push("/mahasiswa/dashboard");
-      }
+      // Login melalui context yang otomatis mengarahkan ke dashboard per role
+      authLogin(result.data.access_token, result.data.user);
     } catch (err: unknown) {
       const message =
         err instanceof Error

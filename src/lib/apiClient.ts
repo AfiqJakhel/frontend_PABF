@@ -122,6 +122,39 @@ export const api = {
 
   delete: <T = unknown>(endpoint: string, options?: Omit<RequestOptions, "body">) =>
     apiClient<T>(endpoint, { ...options, method: "DELETE" }),
+
+  getBlob: async (endpoint: string): Promise<Blob> => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: "GET",
+      headers,
+    });
+
+    if (response.status === 401 && token) {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("user");
+        window.location.href = "/login";
+      }
+      throw new Error("Sesi telah berakhir. Silakan login kembali.");
+    }
+
+    if (!response.ok) {
+      let errMsg = `Gagal mengunduh berkas (Status ${response.status})`;
+      try {
+        const errJson = await response.json();
+        if (errJson?.message) errMsg = errJson.message;
+      } catch {
+        // Bukan json
+      }
+      throw new Error(errMsg);
+    }
+
+    return await response.blob();
+  },
 };
 
 export default apiClient;
